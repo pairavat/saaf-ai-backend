@@ -34,6 +34,7 @@ const allowedOrigins = [
   "https://safai-index.vercel.app",
   "https://saaf-ai.vercel.app",
   "https://safaiindex.vercel.app",
+  "*"
 ];
 
 // app.use(
@@ -53,17 +54,7 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or Postman)
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.log("CORS blocked origin:", origin); // Add logging
-        callback(new Error("Not allowed by CORS: " + origin));
-      }
-    },
+    origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"], // Add this
     credentials: true,
