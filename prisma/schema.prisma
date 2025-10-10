@@ -1,0 +1,267 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["nativeTypes"]
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model activity_logs {
+  id          BigInt    @id @default(autoincrement())
+  user_id     BigInt?
+  action      String?   @db.VarChar(255)
+  target_type String?   @db.VarChar(50)
+  target_id   BigInt?
+  metadata    Json?     @db.Json
+  options     String?
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  users       users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model companies {
+  id               BigInt             @id @default(autoincrement())
+  name             String             @db.VarChar(255)
+  description      String?
+  contact_email    String?            @db.VarChar(255)
+  created_at       DateTime?          @default(now()) @db.Timestamp(6)
+  updated_at       DateTime?          @default(now()) @db.Timestamp(6)
+  status           Boolean            @default(true)
+  location_types   location_types[]
+  locations        locations[]
+  registered_users registered_users[]
+  users            users[]
+  cleaner_review   cleaner_review[]   @relation("CompanyReviews")
+}
+
+model hygiene_scores {
+  id           BigInt     @id @default(autoincrement())
+  location_id  BigInt?
+  score        Decimal?   @db.Decimal(5, 2)
+  details      Json?      @db.Json
+  image_url    String?    @db.VarChar(255)
+  inspected_at DateTime   @db.Timestamp(6)
+  created_by   BigInt?
+  created_at   DateTime?  @default(now()) @db.Timestamp(6)
+  users        users?     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  locations    locations? @relation(fields: [location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model locations {
+  id                  BigInt                   @id @default(autoincrement())
+  name                String                   @db.VarChar(255)
+  parent_id           BigInt?
+  company_id          BigInt?
+  latitude            Float?
+  longitude           Float?
+  metadata            Json?                    @db.Json
+  created_at          DateTime?                @default(now()) @db.Timestamp(6)
+  updated_at          DateTime?                @default(now()) @db.Timestamp(6)
+  type_id             BigInt?
+  options             Json?                    @default("{}")
+  lang_preference     String?                  @db.VarChar(255)
+  images              String[]
+  geom                Unsupported("geometry")?
+  assigned_users      LocationAssignment[]
+  cleaner_assignments cleaner_assignments[]
+  hygiene_scores      hygiene_scores[]
+  companies           companies?               @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  locations           locations?               @relation("locationsTolocations", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_locations     locations[]              @relation("locationsTolocations")
+  location_types      location_types?          @relation(fields: [type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // ✅ Add cleaner review relationship
+  cleaner_reviews     cleaner_review[]         @relation("LocationReviews")
+
+  @@index([geom], map: "idx_locations_geom", type: Gist)
+}
+
+model location_types {
+  id                   BigInt           @id @default(autoincrement())
+  name                 String           @db.VarChar(100)
+  parent_id            BigInt?
+  company_id           BigInt?
+  sort_order           Int?
+  created_at           DateTime?        @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?        @default(now()) @db.Timestamp(6)
+  is_toilet            Boolean?
+  companies            companies?       @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  location_types       location_types?  @relation("location_typesTolocation_types", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_location_types location_types[] @relation("location_typesTolocation_types")
+  locations            locations[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model review {
+  id            BigInt          @id @default(autoincrement())
+  user_id       BigInt
+  site_id       Int
+  rating        Int?
+  comment       String?
+  image_urls    String[]
+  created_at    DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at    DateTime?       @default(now()) @db.Timestamp(6)
+  review_photos review_photos[]
+}
+
+model review_photos {
+  id         BigInt    @id
+  user_id    BigInt?
+  image_url  String?   @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  review     review?   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model sessions {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt?
+  token      String?   @unique @db.VarChar(255)
+  expires_at DateTime? @db.Timestamp(6)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model users {
+  id                                BigInt                @id @default(autoincrement())
+  name                              String                @db.VarChar(255)
+  email                             String?               @db.VarChar(255)
+  password                          String
+  company_id                        BigInt?
+  created_at                        DateTime?             @default(now()) @db.Timestamp(6)
+  updated_at                        DateTime?             @default(now()) @db.Timestamp(6)
+  phone                             String?               @unique(map: "unique_phone") @db.VarChar(15)
+  age                               Int?
+  birthdate                         DateTime?             @db.Date
+  role_id                           Int?
+  location_assignments              LocationAssignment[]
+  activity_logs                     activity_logs[]
+  cleaner_assignments_as_cleaner    cleaner_assignments[] @relation("CleanerUser")
+  cleaner_assignments_as_supervisor cleaner_assignments[] @relation("Supervisor")
+  hygiene_scores                    hygiene_scores[]
+  sessions                          sessions[]
+  companies                         companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  role                              Role?                 @relation(fields: [role_id], references: [id])
+  cleaner_reviews                   cleaner_review[]      @relation("CleanerReviews")
+}
+
+model configurations {
+  id          BigInt   @id @default(autoincrement())
+  name        String   @unique @db.VarChar(255)
+  description Json?
+  company_id  BigInt?
+  is_active   Boolean  @default(false)
+  notes       String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model cleaner_review {
+  id              BigInt    @id @default(autoincrement())
+  name            String
+  latitude        Float?
+  longitude       Float?
+  address         String?
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+  location_id     BigInt?
+  cleaner_user_id BigInt?
+  tasks           String[]
+  initial_comment String?
+  final_comment   String?
+  before_photo    String[]
+  after_photo     String[]
+  status          String    @default("ongoing")
+  company_id      BigInt?
+
+  // ✅ Add foreign key relationships
+  cleaner_user users?     @relation("CleanerReviews", fields: [cleaner_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  location     locations? @relation("LocationReviews", fields: [location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company      companies? @relation("CompanyReviews", fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model user_review {
+  id          BigInt    @id @default(autoincrement())
+  toilet_id   BigInt?
+  name        String?   @db.VarChar(100)
+  email       String?   @db.VarChar(100)
+  phone       String?   @db.VarChar(20)
+  rating      Float?
+  description String?
+  reason_ids  Int[]
+  images      String[]
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  longitude   Float?
+  latitude    Float?
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model spatial_ref_sys {
+  srid      Int     @id
+  auth_name String? @db.VarChar(256)
+  auth_srid Int?
+  srtext    String? @db.VarChar(2048)
+  proj4text String? @db.VarChar(2048)
+}
+
+model cleaner_assignments {
+  id              BigInt     @id @default(autoincrement())
+  name            String     @db.VarChar(255)
+  cleaner_user_id BigInt
+  company_id      BigInt
+  type_id         BigInt?
+  location_id     BigInt?
+  status          String?    @default("unassigned") @db.VarChar(50)
+  assigned_on     DateTime?  @default(now()) @db.Timestamp(6)
+  released_on     DateTime?  @db.Timestamp(6)
+  created_at      DateTime?  @default(now()) @db.Timestamp(6)
+  updated_at      DateTime?  @default(now()) @db.Timestamp(6)
+  supervisor_id   BigInt?
+  cleaner_user    users      @relation("CleanerUser", fields: [cleaner_user_id], references: [id])
+  supervisor      users?     @relation("Supervisor", fields: [supervisor_id], references: [id])
+  locations       locations? @relation(fields: [location_id], references: [id], onDelete: Cascade, map: "fk_assignments_location")
+}
+
+model LocationAssignment {
+  id          BigInt    @id @default(autoincrement())
+  location_id BigInt
+  user_id     BigInt
+  is_active   Boolean   @default(true)
+  assigned_at DateTime  @default(now())
+  revoked_at  DateTime?
+  location    locations @relation(fields: [location_id], references: [id], onDelete: Cascade)
+  user        users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([location_id, user_id])
+  @@index([user_id])
+  @@index([location_id])
+}
+
+model Role {
+  id               Int                @id @default(autoincrement())
+  name             String             @unique @db.VarChar(50)
+  description      String?
+  permissions      String[]           @default([])
+  is_active        Boolean            @default(true)
+  created_at       DateTime           @default(now())
+  updated_at       DateTime           @updatedAt
+  registered_users registered_users[]
+  users            users[]
+}
+
+model registered_users {
+  id                 BigInt    @id @default(autoincrement())
+  company_id         BigInt
+  name               String    @db.VarChar(255)
+  phone              String    @unique @db.VarChar(15)
+  role_id            Int
+  temporary_password String?   @db.VarChar(255)
+  is_verified        Boolean   @default(false)
+  verification_token String?   @unique @db.VarChar(255)
+  created_at         DateTime  @default(now()) @db.Timestamp(6)
+  updated_at         DateTime  @default(now()) @db.Timestamp(6)
+  companies          companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  role               Role      @relation(fields: [role_id], references: [id])
+}
