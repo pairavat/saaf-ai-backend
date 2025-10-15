@@ -23,7 +23,6 @@ steps:
       '--region', 'asia-south1',
       '--platform', 'managed',
       '--allow-unauthenticated',
-      '--set-secrets', 'DATABASE_URL=DATABASE_URL:latest',
       '--quiet'
     ]
 
