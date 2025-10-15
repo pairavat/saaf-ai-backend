@@ -1,6 +1,20 @@
+# Ignore unnecessary files
 node_modules
-package-lock.json
-# Keep environment variables out of version control
+npm-debug.log
+Dockerfile
+docker-compose.yml
+.git
+.gitignore
 
-/generated/prisma
+# Keep package files if needed
+package-lock.json
+
+# Do NOT ignore prisma directory
+# ❌ Remove or comment this line if it exists:
+# /generated/prisma
+
+# Optional local files to ignore
 controller/cleanerReviewController - Copy.js
+.env.local
+.env.*
+!.env.example
