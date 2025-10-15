@@ -1,29 +1,24 @@
-# Use official Node.js 20 Alpine image for small size
+# Use Node.js 20 Alpine image
 FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json first (for caching npm install)
+# Copy package.json and package-lock.json first (for caching)
 COPY package*.json ./
 
-# Copy Prisma schema before running npm install
+# Copy Prisma schema before npm install
 COPY prisma ./prisma
 
-# Install only production dependencies
+# Install production dependencies
 RUN npm install --production
 
-# Copy the rest of your application code
+# Copy the rest of the app
 COPY . .
 
-# If you need Prisma client generated in production (optional)
-# RUN npx prisma generate --schema=./prisma/schema.prisma
-
-# Expose port 8080 (Cloud Run default)
-EXPOSE 8080
-
-# Set environment variable for Cloud Run port
+# Expose Cloud Run default port
 ENV PORT=8080
+EXPOSE 8080
 
 # Start the app
 CMD ["npm", "start"]
