@@ -1,20 +1,18 @@
-# Use Node.js 20 Alpine (lightweight)
 FROM node:20-alpine
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package.json & package-lock.json
 COPY package*.json ./
+
+# Copy Prisma schema (and any other source needed for postinstall)
+COPY prisma ./prisma
 
 # Install dependencies
 RUN npm install --production
 
-# Copy all project files
+# Copy rest of your app
 COPY . .
 
-# Expose the port Cloud Run expects
 EXPOSE 8080
-
-# Start your app
 CMD ["npm", "start"]
