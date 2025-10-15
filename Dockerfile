@@ -1,16 +1,16 @@
-# Use Node.js 20 Alpine image
+# Node.js 20 Alpine for small size
 FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json first (for caching)
+# Copy package.json & package-lock.json first (for caching)
 COPY package*.json ./
 
-# Copy Prisma schema before npm install
+# Copy Prisma schema (required for postinstall)
 COPY prisma ./prisma
 
-# Install production dependencies
+# Install dependencies
 RUN npm install --production
 
 # Copy the rest of the app
@@ -20,5 +20,5 @@ COPY . .
 ENV PORT=8080
 EXPOSE 8080
 
-# Start the app
-CMD ["npm", "start"]
+# Start the app (ESM entrypoint)
+CMD ["node", "--experimental-modules", "index.mjs"]
