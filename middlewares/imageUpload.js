@@ -40,7 +40,8 @@ export const processAndUploadImages = (fieldConfigs) => {
                             return res.status(500).json({
                                 status: 'error',
                                 message: `Failed to upload ${fieldName}`,
-                                detail: uploadError.message
+                                detail: uploadError.message,
+                                error: uploadError
                             });
                         }
                     }
