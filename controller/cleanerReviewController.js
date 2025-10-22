@@ -24,7 +24,7 @@ export async function getCleanerReview(req, res) {
       whereClause.cleaner_user_id = BigInt(cleaner_user_id);
     }
     if (company_id) {
-      whereClause.company_id = company_id
+      whereClause.company_id = company_id;
     }
 
     if (status) {
@@ -49,28 +49,25 @@ export async function getCleanerReview(req, res) {
       include: {
         cleaner_user: {
           include: {
-            role: true  // Include all role fields
-          }
+            role: true, // Include all role fields
+          },
         },
         location: {
           include: {
-            location_types: true,  // Include all location_type fields
-            locations: true        // Include all parent location fields
-          }
+            location_types: true, // Include all location_type fields
+            locations: true, // Include all parent location fields
+          },
         },
-        company: true  // Include all company fields
-      }
+        company: true, // Include all company fields
+      },
     });
-
-
-
 
     // ✅ Fixed serialization function
     const safeSerialize = (obj) => {
       if (obj === null || obj === undefined) return obj;
 
       // ✅ Handle BigInt
-      if (typeof obj === 'bigint') return obj.toString();
+      if (typeof obj === "bigint") return obj.toString();
 
       // ✅ Handle Date objects BEFORE generic object handling
       if (obj instanceof Date) return obj.toISOString();
@@ -79,7 +76,7 @@ export async function getCleanerReview(req, res) {
       if (Array.isArray(obj)) return obj.map(safeSerialize);
 
       // ✅ Handle generic objects (but after Date check)
-      if (typeof obj === 'object') {
+      if (typeof obj === "object") {
         const serialized = {};
         for (const [key, value] of Object.entries(obj)) {
           serialized[key] = safeSerialize(value);
@@ -91,10 +88,9 @@ export async function getCleanerReview(req, res) {
       return obj;
     };
 
-
     // ✅ Serialize all review data
-    const serializedReviews = reviews.map(review => safeSerialize(review));
-    console.log('befor serilize', serializedReviews);
+    const serializedReviews = reviews.map((review) => safeSerialize(review));
+    console.log("befor serilize", serializedReviews);
     // const serialized = reviews.map((r) => {
     //   const safeReview = {};
     //   for (const [key, value] of Object.entries(r)) {
@@ -115,11 +111,8 @@ export async function getCleanerReview(req, res) {
   }
 }
 
-
-
-
 export const getCleanerReviewsById = async (req, res) => {
-  console.log('Getting cleaner reviews by cleaner_user_id');
+  console.log("Getting cleaner reviews by cleaner_user_id");
   const { cleaner_user_id } = req.params;
   console.log(req.params, "params");
 
@@ -129,7 +122,7 @@ export const getCleanerReviewsById = async (req, res) => {
     if (!cleaner_user_id || isNaN(cleaner_user_id)) {
       return res.status(400).json({
         status: "error",
-        message: "Invalid cleaner user ID provided"
+        message: "Invalid cleaner user ID provided",
       });
     }
 
@@ -152,10 +145,10 @@ export const getCleanerReviewsById = async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                description: true
-              }
-            }
-          }
+                description: true,
+              },
+            },
+          },
         },
         // ✅ Include location details
         location: {
@@ -168,28 +161,29 @@ export const getCleanerReviewsById = async (req, res) => {
             location_types: {
               select: {
                 id: true,
-                name: true
-              }
+                name: true,
+              },
             },
-            locations: { // parent location
+            locations: {
+              // parent location
               select: {
                 id: true,
-                name: true
-              }
-            }
-          }
+                name: true,
+              },
+            },
+          },
         },
         // ✅ Include company details
         company: {
           select: {
             id: true,
             name: true,
-            description: true
-          }
-        }
+            description: true,
+          },
+        },
       },
       orderBy: {
-        created_at: 'desc',
+        created_at: "desc",
       },
     });
 
@@ -199,7 +193,7 @@ export const getCleanerReviewsById = async (req, res) => {
         message: "No reviews found for this cleaner",
         data: {
           reviews: [],
-          stats: stats  // important
+          stats: stats, // important
         },
       });
     }
@@ -209,7 +203,7 @@ export const getCleanerReviewsById = async (req, res) => {
       if (obj === null || obj === undefined) return obj;
 
       // ✅ Handle BigInt
-      if (typeof obj === 'bigint') return obj.toString();
+      if (typeof obj === "bigint") return obj.toString();
 
       // ✅ Handle Date objects BEFORE generic object handling
       if (obj instanceof Date) return obj.toISOString();
@@ -218,7 +212,7 @@ export const getCleanerReviewsById = async (req, res) => {
       if (Array.isArray(obj)) return obj.map(safeSerialize);
 
       // ✅ Handle generic objects (but after Date check)
-      if (typeof obj === 'object') {
+      if (typeof obj === "object") {
         const serialized = {};
         for (const [key, value] of Object.entries(obj)) {
           serialized[key] = safeSerialize(value);
@@ -230,16 +224,18 @@ export const getCleanerReviewsById = async (req, res) => {
       return obj;
     };
 
-
     // ✅ Serialize all review data
-    const serializedReviews = reviews.map(review => safeSerialize(review));
+    const serializedReviews = reviews.map((review) => safeSerialize(review));
 
     // ✅ Calculate stats from the reviews
     stats = {
       total_reviews: serializedReviews.length,
-      completed_reviews: serializedReviews.filter(r => r.status === 'completed').length,
-      ongoing_reviews: serializedReviews.filter(r => r.status === 'ongoing').length,
-      total_tasks_today: serializedReviews.filter(r => {
+      completed_reviews: serializedReviews.filter(
+        (r) => r.status === "completed"
+      ).length,
+      ongoing_reviews: serializedReviews.filter((r) => r.status === "ongoing")
+        .length,
+      total_tasks_today: serializedReviews.filter((r) => {
         try {
           const today = new Date();
           const reviewDate = new Date(r.created_at);
@@ -252,30 +248,31 @@ export const getCleanerReviewsById = async (req, res) => {
       // cleaner_info: serializedReviews[0]?.cleaner_user || null
     };
 
-    console.log('Successfully fetched reviews with relationships');
+    console.log("Successfully fetched reviews with relationships");
 
     res.json({
       status: "success",
       data: {
         reviews: serializedReviews,
-        stats: stats  // important
+        stats: stats, // important
       },
-      message: "Cleaner reviews retrieved successfully!"
+      message: "Cleaner reviews retrieved successfully!",
     });
-
   } catch (err) {
     console.error("Fetch Reviews by Cleaner ID Error:", err);
     res.status(500).json({
       status: "error",
       message: "Failed to fetch cleaner reviews by cleaner ID",
-      detail: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+      detail:
+        process.env.NODE_ENV === "development"
+          ? err.message
+          : "Internal server error",
     });
   }
 };
 
-
 export const getCleanerReviewsByTaskId = async (req, res) => {
-  console.log('Getting cleaner reviews by task id');
+  console.log("Getting cleaner reviews by task id");
   const { task_id } = req.params;
   console.log(req.params, "params");
 
@@ -285,7 +282,7 @@ export const getCleanerReviewsByTaskId = async (req, res) => {
     if (!task_id || isNaN(task_id)) {
       return res.status(400).json({
         status: "error",
-        message: "Invalid cleaner user ID provided"
+        message: "Invalid cleaner user ID provided",
       });
     }
 
@@ -308,10 +305,10 @@ export const getCleanerReviewsByTaskId = async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                description: true
-              }
-            }
-          }
+                description: true,
+              },
+            },
+          },
         },
         // ✅ Include location details
         location: {
@@ -324,28 +321,29 @@ export const getCleanerReviewsByTaskId = async (req, res) => {
             location_types: {
               select: {
                 id: true,
-                name: true
-              }
+                name: true,
+              },
             },
-            locations: { // parent location
+            locations: {
+              // parent location
               select: {
                 id: true,
-                name: true
-              }
-            }
-          }
+                name: true,
+              },
+            },
+          },
         },
         // ✅ Include company details
         company: {
           select: {
             id: true,
             name: true,
-            description: true
-          }
-        }
+            description: true,
+          },
+        },
       },
       orderBy: {
-        created_at: 'desc',
+        created_at: "desc",
       },
     });
 
@@ -355,7 +353,7 @@ export const getCleanerReviewsByTaskId = async (req, res) => {
         message: "No reviews found for this cleaner",
         data: {
           reviews: [],
-          stats: stats  // important
+          stats: stats, // important
         },
       });
     }
@@ -367,7 +365,7 @@ export const getCleanerReviewsByTaskId = async (req, res) => {
       if (obj === null || obj === undefined) return obj;
 
       // ✅ Handle BigInt
-      if (typeof obj === 'bigint') return obj.toString();
+      if (typeof obj === "bigint") return obj.toString();
 
       // ✅ Handle Date objects BEFORE generic object handling
       if (obj instanceof Date) return obj.toISOString();
@@ -376,7 +374,7 @@ export const getCleanerReviewsByTaskId = async (req, res) => {
       if (Array.isArray(obj)) return obj.map(safeSerialize);
 
       // ✅ Handle generic objects (but after Date check)
-      if (typeof obj === 'object') {
+      if (typeof obj === "object") {
         const serialized = {};
         for (const [key, value] of Object.entries(obj)) {
           serialized[key] = safeSerialize(value);
@@ -388,17 +386,19 @@ export const getCleanerReviewsByTaskId = async (req, res) => {
       return obj;
     };
 
-
     // ✅ Serialize all review data
-    const serializedReviews = reviews.map(review => safeSerialize(review));
+    const serializedReviews = reviews.map((review) => safeSerialize(review));
 
-    console.log(serializedReviews, "serilized regviews")
+    console.log(serializedReviews, "serilized regviews");
     // ✅ Calculate stats from the reviews
     stats = {
       total_reviews: serializedReviews.length,
-      completed_reviews: serializedReviews.filter(r => r.status === 'completed').length,
-      ongoing_reviews: serializedReviews.filter(r => r.status === 'ongoing').length,
-      total_tasks_today: serializedReviews.filter(r => {
+      completed_reviews: serializedReviews.filter(
+        (r) => r.status === "completed"
+      ).length,
+      ongoing_reviews: serializedReviews.filter((r) => r.status === "ongoing")
+        .length,
+      total_tasks_today: serializedReviews.filter((r) => {
         try {
           const today = new Date();
           const reviewDate = new Date(r.created_at);
@@ -411,23 +411,25 @@ export const getCleanerReviewsByTaskId = async (req, res) => {
       // cleaner_info: serializedReviews[0]?.cleaner_user || null
     };
 
-    console.log('Successfully fetched reviews with relationships');
+    console.log("Successfully fetched reviews with relationships");
 
     res.json({
       status: "success",
       data: {
         reviews: serializedReviews,
-        stats: stats  // important
+        stats: stats, // important
       },
-      message: "Cleaner reviews retrieved successfully!"
+      message: "Cleaner reviews retrieved successfully!",
     });
-
   } catch (err) {
     console.error("Fetch Reviews by Cleaner ID Error:", err);
     res.status(500).json({
       status: "error",
       message: "Failed to fetch cleaner reviews by cleaner ID",
-      detail: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+      detail:
+        process.env.NODE_ENV === "development"
+          ? err.message
+          : "Internal server error",
     });
   }
 };
@@ -493,7 +495,6 @@ export const getCleanerReviewsByTaskId = async (req, res) => {
 //   }
 // }
 
-
 export async function createCleanerReview(req, res) {
   try {
     const {
@@ -505,7 +506,7 @@ export async function createCleanerReview(req, res) {
       cleaner_user_id,
       tasks,
       initial_comment,
-      company_id
+      company_id,
     } = req.body;
 
     // Get uploaded URLs from middleware
@@ -516,7 +517,7 @@ export async function createCleanerReview(req, res) {
     if (tasks) {
       if (Array.isArray(tasks)) {
         parsedTasks = tasks.map(String);
-      } else if (typeof tasks === 'string') {
+      } else if (typeof tasks === "string") {
         try {
           const parsed = JSON.parse(tasks);
           if (Array.isArray(parsed)) {
@@ -525,19 +526,19 @@ export async function createCleanerReview(req, res) {
             parsedTasks = [String(parsed)];
           }
         } catch (e) {
-          parsedTasks = tasks.split(',').map(task => String(task).trim());
+          parsedTasks = tasks.split(",").map((task) => String(task).trim());
         }
       }
     }
 
     // ✅ Add length validation
     if (parsedTasks.length === 0) {
-      console.warn('No tasks provided for review');
+      console.warn("No tasks provided for review");
     }
 
-    console.log('Original tasks:', tasks);
-    console.log('Parsed tasks:', parsedTasks);
-    console.log('Tasks count:', parsedTasks.length);
+    console.log("Original tasks:", tasks);
+    console.log("Parsed tasks:", parsedTasks);
+    console.log("Tasks count:", parsedTasks.length);
 
     const review = await prisma.cleaner_review.create({
       data: {
@@ -551,32 +552,29 @@ export async function createCleanerReview(req, res) {
         initial_comment: initial_comment || null,
         before_photo: beforePhotos,
         after_photo: [],
-        status: 'ongoing',
-        company_id: company_id ? BigInt(company_id) : null
+        status: "ongoing",
+        company_id: company_id ? BigInt(company_id) : null,
       },
     });
-
 
     const serializedData = {
       ...review,
       id: review?.id.toString(),
       location_id: review?.location_id?.toString(),
       cleaner_user_id: review?.cleaner_user_id?.toString(),
-      company_id: review?.company_id?.toString()
+      company_id: review?.company_id?.toString(),
     };
 
-    res.status(201).json({ status: 'success', data: serializedData });
+    res.status(201).json({ status: "success", data: serializedData });
   } catch (err) {
-    console.error('Create Review Error:', err);
-    res.status(400).json({ status: 'error', detail: err.message });
+    console.error("Create Review Error:", err);
+    res.status(400).json({ status: "error", detail: err.message });
   }
 }
-
 
 // =========================================================
 // 4️⃣ COMPLETE review (after photos + AI scoring)
 // =========================================================
-
 
 // export async function completeCleanerReview(req, res) {
 //   try {
@@ -656,9 +654,6 @@ export async function createCleanerReview(req, res) {
 //   }
 // }
 
-
-
-
 // export async function completeCleanerReview(req, res) {
 //   try {
 //     const { final_comment, id } = req.body;
@@ -737,9 +732,6 @@ export async function createCleanerReview(req, res) {
 //     res.status(400).json({ status: "error", detail: err.message });
 //   }
 // }
-
-
-
 
 // export async function completeCleanerReview(req, res) {
 //   try {
@@ -905,51 +897,60 @@ export async function createCleanerReview(req, res) {
 //   }
 // }
 
-
 export async function completeCleanerReview(req, res) {
   try {
     const { final_comment, id } = req.body;
-
-    // ✅ Get Cloudinary URLs from middleware
     const afterPhotos = req.uploadedFiles?.after_photo || [];
 
-    // Process AI hygiene scoring
-    const score = await processHygieneScoring(afterPhotos);
-
-    // Update DB
+    // 1️⃣ Update the review immediately as "processing"
     const review = await prisma.cleaner_review.update({
       where: { id: BigInt(id) },
       data: {
         after_photo: afterPhotos,
         final_comment: final_comment || null,
-        status: "completed",
-        score: score,
-        updated_at: new Date().toISOString()
+        status: "processing",
+        updated_at: new Date().toISOString(),
       },
     });
 
-    // const serializedData = {
-    //   ...review,
-    //   id: review?.id.toString(),
-    //   location_id: review?.location_id?.toString(),
-    //   cleaner_user_id: review?.cleaner_user_id?.toString(),
-    //   company_id: review?.company_id?.toString(),
-    // };
-
-    // ✅ Convert BigInts safely for JSON response
-    const serialized = stringifyBigInts(updatedReview);
-
+    // 2️⃣ Respond immediately to mobile app
     res.json({
-      status: 'success',
-      message: 'Review completed successfully',
-      data: serialized,
+      status: "success",
+      message: "Review submitted successfully. Scoring in progress.",
+      data: stringifyBigInts(review),
     });
 
-    // ✅ AI scoring with comprehensive error handling
-    // processHygieneScoring(review, afterPhotos);
-    // Process AI hygiene scoring
-    // const score = await processHygieneScoring(review.after_photo);
+    // 3️⃣ Background: process AI scoring asynchronously (no delay to user)
+    process.nextTick(async () => {
+      try {
+        console.log("⚙️ Background: Processing hygiene scoring for review", id);
 
+        const score = await processHygieneScoring(afterPhotos);
+
+        await prisma.cleaner_review.update({
+          where: { id: BigInt(id) },
+          data: {
+            score,
+            status: "completed",
+            updated_at: new Date().toISOString(),
+          },
+        });
+
+        console.log(`✅ Review ${id} scored successfully: ${score}`);
+      } catch (bgError) {
+        console.error(
+          `❌ Background scoring failed for review ${id}:`,
+          bgError.message
+        );
+        await prisma.cleaner_review.update({
+          where: { id: BigInt(id) },
+          data: {
+            status: "failed",
+            updated_at: new Date().toISOString(),
+          },
+        });
+      }
+    });
   } catch (err) {
     console.error("Error completing review:", err.message);
     res.status(400).json({ status: "error", detail: err.message });
@@ -959,21 +960,24 @@ export async function completeCleanerReview(req, res) {
 /**
  * Process hygiene scoring by sending image data or URLs to AI model.
  * Supports both binary file uploads (buffers) and URL arrays.
- * 
+ *
  * @param {Array} images - Either array of image URLs or Multer file objects (with buffer)
  * @returns {Number} Hygiene score (0–100)
  */
 export const processHygieneScoring = async (images) => {
   try {
     if (!images || images.length === 0) {
-      console.warn('⚠️ No images provided for scoring.');
+      console.warn("⚠️ No images provided for scoring.");
       return 0;
     }
 
-    const AI_URL = 'https://pugarch-c-score-776087882401.europe-west1.run.app/predict';
+    const AI_URL =
+      "https://pugarch-c-score-776087882401.europe-west1.run.app/predict";
     const formData = new FormData();
 
-    console.log(`🧠 Downloading and attaching ${images.length} images for scoring...`);
+    console.log(
+      `🧠 Downloading and attaching ${images.length} images for scoring...`
+    );
 
     // 1️⃣ Download each image as binary
     for (let i = 0; i < images.length; i++) {
@@ -981,13 +985,19 @@ export const processHygieneScoring = async (images) => {
       const fileName = `image_${i + 1}.jpg`;
 
       try {
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
-        const buffer = Buffer.from(response.data, 'binary');
+        const response = await axios.get(url, { responseType: "arraybuffer" });
+        const buffer = Buffer.from(response.data, "binary");
 
         // 2️⃣ Attach each buffer to FormData as a file
-        formData.append('images', buffer, { filename: fileName, contentType: 'image/jpeg' });
+        formData.append("images", buffer, {
+          filename: fileName,
+          contentType: "image/jpeg",
+        });
       } catch (downloadErr) {
-        console.error(`❌ Failed to download image ${url}:`, downloadErr.message);
+        console.error(
+          `❌ Failed to download image ${url}:`,
+          downloadErr.message
+        );
       }
     }
 
@@ -1000,11 +1010,11 @@ export const processHygieneScoring = async (images) => {
 
     // 4️⃣ Extract score from AI model
     const score = aiResponse.data?.score ?? 0;
-    console.log('✅ Hygiene Score Received:', score);
+    console.log("✅ Hygiene Score Received:", score);
 
     return score;
   } catch (error) {
-    console.error('❌ Error processing hygiene score:', error.message);
+    console.error("❌ Error processing hygiene score:", error.message);
     return 0; // fallback score
   }
 };
@@ -1012,11 +1022,11 @@ export const processHygieneScoring = async (images) => {
 function stringifyBigInts(obj) {
   if (Array.isArray(obj)) {
     return obj.map(stringifyBigInts);
-  } else if (obj && typeof obj === 'object') {
+  } else if (obj && typeof obj === "object") {
     const result = {};
     for (const key in obj) {
       const value = obj[key];
-      if (typeof value === 'bigint') {
+      if (typeof value === "bigint") {
         result[key] = value.toString();
       } else {
         result[key] = stringifyBigInts(value);
@@ -1026,7 +1036,6 @@ function stringifyBigInts(obj) {
   }
   return obj;
 }
-
 
 // ✅ Separate function for AI processing
 // async function processHygieneScoring(review, afterPhotos) {
