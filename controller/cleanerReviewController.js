@@ -914,7 +914,7 @@ export async function completeCleanerReview(req, res) {
     const afterPhotos = req.uploadedFiles?.after_photo || [];
 
     // Process AI hygiene scoring
-    const score = await processHygieneScoring(review.photos);
+    const score = await processHygieneScoring(afterPhotos);
 
     // Update DB
     const review = await prisma.cleaner_review.update({
