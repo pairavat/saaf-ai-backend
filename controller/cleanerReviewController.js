@@ -913,6 +913,9 @@ export async function completeCleanerReview(req, res) {
     // ✅ Get Cloudinary URLs from middleware
     const afterPhotos = req.uploadedFiles?.after_photo || [];
 
+    // Process AI hygiene scoring
+    const score = await processHygieneScoring(review.photos);
+
     // Update DB
     const review = await prisma.cleaner_review.update({
       where: { id: BigInt(id) },
@@ -920,26 +923,29 @@ export async function completeCleanerReview(req, res) {
         after_photo: afterPhotos,
         final_comment: final_comment || null,
         status: "completed",
+        score: score,
         updated_at: new Date().toISOString()
       },
     });
 
-    const serializedData = {
-      ...review,
-      id: review?.id.toString(),
-      location_id: review?.location_id?.toString(),
-      cleaner_user_id: review?.cleaner_user_id?.toString(),
-      company_id: review?.company_id?.toString(),
-    };
+    // const serializedData = {
+    //   ...review,
+    //   id: review?.id.toString(),
+    //   location_id: review?.location_id?.toString(),
+    //   cleaner_user_id: review?.cleaner_user_id?.toString(),
+    //   company_id: review?.company_id?.toString(),
+    // };
 
     res.json({
       status: "success",
       message: "Review completed successfully",
-      data: serializedData,
+      data: review,
     });
 
     // ✅ AI scoring with comprehensive error handling
-    processHygieneScoring(review, afterPhotos);
+    // processHygieneScoring(review, afterPhotos);
+    // Process AI hygiene scoring
+    // const score = await processHygieneScoring(review.after_photo);
 
   } catch (err) {
     console.error("Error completing review:", err.message);
@@ -947,192 +953,244 @@ export async function completeCleanerReview(req, res) {
   }
 }
 
-// ✅ Separate function for AI processing
-async function processHygieneScoring(review, afterPhotos) {
-  // Helper function to generate fake scores
-  const generateFakeScores = (imageUrls) => {
-    console.log(`Generating fake scores for ${imageUrls.length} images...`);
-    return imageUrls.map((url, index) => ({
-      score: Math.floor(Math.random() * (10 - 6 + 1)) + 6, // Random between 6-10
-      metadata: {
-        cleanliness: Math.floor(Math.random() * (10 - 6 + 1)) + 6,
-        organization: Math.floor(Math.random() * (10 - 6 + 1)) + 6,
-        overall_hygiene: Math.floor(Math.random() * (10 - 6 + 1)) + 6,
-        demo_mode: true,
-        generated_at: new Date().toISOString(),
-        image_index: index + 1
-      },
-      filename: `after_photo_${index + 1}`,
-      image_url: url
-    }));
-  };
-
-  // Helper function to save scores to database
-  const saveScoresToDatabase = async (scores, reviewData) => {
-    const savedScores = [];
-
-    for (let i = 0; i < scores.length; i++) {
-      const scoreItem = scores[i];
-
-      try {
-        const savedScore = await prisma.hygiene_scores.create({
-          data: {
-            location_id: reviewData.location_id,
-            score: Number(scoreItem.score) || 7, // Ensure it's a number
-            details: scoreItem.metadata || {},
-            image_url: afterPhotos[i] || scoreItem.image_url || null,
-            inspected_at: new Date(),
-            created_by: reviewData.cleaner_user_id,
-          },
-        });
-
-        savedScores.push(savedScore);
-        console.log(`✅ Score ${i + 1} saved successfully:`, scoreItem.score);
-
-      } catch (dbError) {
-        console.error(`Failed to save score ${i + 1}:`, dbError.message);
-      }
-    }
-
-    return savedScores;
-  };
-
+/**
+ * Process hygiene scoring by sending image data or URLs to AI model.
+ * Supports both binary file uploads (buffers) and URL arrays.
+ * 
+ * @param {Array} images - Either array of image URLs or Multer file objects (with buffer)
+ * @returns {Number} Hygiene score (0–100)
+ */
+export const processHygieneScoring = async (images) => {
   try {
-    console.log('🚀 AI scoring started for review:', review.id);
-    console.log('📸 Processing', afterPhotos.length, 'after photos');
-
-    if (afterPhotos.length === 0) {
-      console.log('⚠️ No after photos to process');
-      return;
+    if (!images || images.length === 0) {
+      console.warn('No images provided for scoring.');
+      return 0;
     }
 
-    let scoreData = [];
-    let processingMethod = 'unknown';
+    const AI_URL = 'https://pugarch-c-score-776087882401.europe-west1.run.app/predict'; // 👈 AI endpoint
 
-    try {
-      // Method 1: Try sending URLs to AI service
-      console.log('🔄 Method 1: Sending Cloudinary URLs to AI...');
+    let response;
 
-      const urlPayload = {
-        images: afterPhotos
-      };
+    // Check if images are buffers (from multer) or URLs (strings)
+    const isBufferArray = typeof images[0] === 'object' && images[0].buffer;
 
-      const aiResponse = await axios.post(
-        "https://pugarch-c-score-369586418873.europe-west1.run.app/predict",
-        urlPayload,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'CleanerReview/1.0'
-          },
-          timeout: 15000
-        }
-      );
+    if (isBufferArray) {
+      // ---------- CASE 1: Send binary files ----------
+      const formData = new FormData();
 
-      if (aiResponse.data && Array.isArray(aiResponse.data)) {
-        scoreData = aiResponse.data;
-        processingMethod = 'URL';
-        console.log('✅ AI scoring successful with URLs');
-      } else {
-        throw new Error('Invalid AI response format');
-      }
+      images.forEach((file, index) => {
+        formData.append('images', file.buffer, {
+          filename: file.originalname || `image_${index}.jpg`,
+          contentType: file.mimetype || 'image/jpeg',
+        });
+      });
 
-    } catch (urlError) {
-      console.log('❌ Method 1 failed:', urlError.message);
-
-      try {
-        // Method 2: Download images and send as files
-        console.log('🔄 Method 2: Downloading images and sending as files...');
-
-        const formData = new FormData();
-        const downloadPromises = [];
-
-        // Download all images concurrently
-        for (let i = 0; i < afterPhotos.length; i++) {
-          const imageUrl = afterPhotos[i];
-
-          const downloadPromise = axios({
-            url: imageUrl,
-            method: 'GET',
-            responseType: 'stream',
-            timeout: 10000,
-            headers: {
-              'User-Agent': 'CleanerReview-ImageDownloader/1.0'
-            }
-          }).then(response => {
-            formData.append('images', response.data, `image_${i}.jpg`);
-            return true;
-          }).catch(err => {
-            console.error(`Failed to download image ${i}:`, err.message);
-            return false;
-          });
-
-          downloadPromises.push(downloadPromise);
-        }
-
-        // Wait for all downloads
-        const downloadResults = await Promise.all(downloadPromises);
-        const successfulDownloads = downloadResults.filter(result => result === true).length;
-
-        console.log(`📥 Downloaded ${successfulDownloads}/${afterPhotos.length} images`);
-
-        if (successfulDownloads > 0) {
-          const aiResponse = await axios.post(
-            "https://pugarch-c-score-369586418873.europe-west1.run.app/predict",
-            formData,
-            {
-              headers: {
-                ...formData.getHeaders(),
-                'User-Agent': 'CleanerReview-AIService/1.0'
-              },
-              timeout: 30000 // Longer timeout for file upload
-            }
-          );
-
-          if (aiResponse.data && Array.isArray(aiResponse.data)) {
-            scoreData = aiResponse.data;
-            processingMethod = 'File Upload';
-            console.log('✅ AI scoring successful with file upload');
-          } else {
-            throw new Error('Invalid AI response format');
-          }
-        } else {
-          throw new Error('Failed to download any images');
-        }
-
-      } catch (downloadError) {
-        console.log('❌ Method 2 failed:', downloadError.message);
-        throw downloadError; // Will trigger fake score generation
-      }
-    }
-
-    // Process real AI results
-    console.log(`🎯 Processing ${scoreData.length} AI scores via ${processingMethod}`);
-    await saveScoresToDatabase(scoreData, review);
-    console.log('✅ Real AI hygiene scores saved for review:', review.id);
-
-  } catch (aiError) {
-    // ✅ Fallback: Generate and save fake scores
-    console.error('🔴 AI Scoring completely failed:', {
-      message: aiError.message,
-      status: aiError.response?.status,
-      statusText: aiError.response?.statusText
-    });
-
-    try {
-      console.log('🎲 Generating fake scores as fallback...');
-      const fakeScores = generateFakeScores(afterPhotos);
-
-      console.log('💾 Saving fake scores to database...');
-      await saveScoresToDatabase(fakeScores, review);
-
-      console.log('✅ Fake hygiene scores saved successfully for demo purposes');
-
-    } catch (fakeError) {
-      console.error('🔴 Critical: Failed to save fake scores:', {
-        message: fakeError.message,
-        stack: fakeError.stack
+      response = await axios.post(AI_URL, formData, {
+        headers: formData.getHeaders(),
+        maxBodyLength: Infinity,
+      });
+    } else {
+      // ---------- CASE 2: Send image URLs ----------
+      response = await axios.post(AI_URL, {
+        images: images, // array of Cloudinary URLs
       });
     }
+
+    const score = response.data?.score ?? 0;
+    console.log('✅ Hygiene Score Received:', score);
+    return score;
+  } catch (error) {
+    console.error('❌ Error processing hygiene score:', error.message);
+    return 0; // fallback score
   }
-}
+};
+
+// ✅ Separate function for AI processing
+// async function processHygieneScoring(review, afterPhotos) {
+//   // Helper function to generate fake scores
+//   const generateFakeScores = (imageUrls) => {
+//     console.log(`Generating fake scores for ${imageUrls.length} images...`);
+//     return imageUrls.map((url, index) => ({
+//       score: Math.floor(Math.random() * (10 - 6 + 1)) + 6, // Random between 6-10
+//       metadata: {
+//         cleanliness: Math.floor(Math.random() * (10 - 6 + 1)) + 6,
+//         organization: Math.floor(Math.random() * (10 - 6 + 1)) + 6,
+//         overall_hygiene: Math.floor(Math.random() * (10 - 6 + 1)) + 6,
+//         demo_mode: true,
+//         generated_at: new Date().toISOString(),
+//         image_index: index + 1
+//       },
+//       filename: `after_photo_${index + 1}`,
+//       image_url: url
+//     }));
+//   };
+
+//   // Helper function to save scores to database
+//   const saveScoresToDatabase = async (scores, reviewData) => {
+//     const savedScores = [];
+
+//     for (let i = 0; i < scores.length; i++) {
+//       const scoreItem = scores[i];
+
+//       try {
+//         const savedScore = await prisma.hygiene_scores.create({
+//           data: {
+//             location_id: reviewData.location_id,
+//             score: Number(scoreItem.score) || 7, // Ensure it's a number
+//             details: scoreItem.metadata || {},
+//             image_url: afterPhotos[i] || scoreItem.image_url || null,
+//             inspected_at: new Date(),
+//             created_by: reviewData.cleaner_user_id,
+//           },
+//         });
+
+//         savedScores.push(savedScore);
+//         console.log(`✅ Score ${i + 1} saved successfully:`, scoreItem.score);
+
+//       } catch (dbError) {
+//         console.error(`Failed to save score ${i + 1}:`, dbError.message);
+//       }
+//     }
+
+//     return savedScores;
+//   };
+
+//   try {
+//     console.log('🚀 AI scoring started for review:', review.id);
+//     console.log('📸 Processing', afterPhotos.length, 'after photos');
+
+//     if (afterPhotos.length === 0) {
+//       console.log('⚠️ No after photos to process');
+//       return;
+//     }
+
+//     let scoreData = [];
+//     let processingMethod = 'unknown';
+
+//     try {
+//       // Method 1: Try sending URLs to AI service
+//       console.log('🔄 Method 1: Sending Cloudinary URLs to AI...');
+
+//       const urlPayload = {
+//         images: afterPhotos
+//       };
+
+//       const aiResponse = await axios.post(
+//         "https://pugarch-c-score-369586418873.europe-west1.run.app/predict",
+//         urlPayload,
+//         {
+//           headers: {
+//             'Content-Type': 'application/json',
+//             'User-Agent': 'CleanerReview/1.0'
+//           },
+//           timeout: 15000
+//         }
+//       );
+
+//       if (aiResponse.data && Array.isArray(aiResponse.data)) {
+//         scoreData = aiResponse.data;
+//         processingMethod = 'URL';
+//         console.log('✅ AI scoring successful with URLs');
+//       } else {
+//         throw new Error('Invalid AI response format');
+//       }
+
+//     } catch (urlError) {
+//       console.log('❌ Method 1 failed:', urlError.message);
+
+//       try {
+//         // Method 2: Download images and send as files
+//         console.log('🔄 Method 2: Downloading images and sending as files...');
+
+//         const formData = new FormData();
+//         const downloadPromises = [];
+
+//         // Download all images concurrently
+//         for (let i = 0; i < afterPhotos.length; i++) {
+//           const imageUrl = afterPhotos[i];
+
+//           const downloadPromise = axios({
+//             url: imageUrl,
+//             method: 'GET',
+//             responseType: 'stream',
+//             timeout: 10000,
+//             headers: {
+//               'User-Agent': 'CleanerReview-ImageDownloader/1.0'
+//             }
+//           }).then(response => {
+//             formData.append('images', response.data, `image_${i}.jpg`);
+//             return true;
+//           }).catch(err => {
+//             console.error(`Failed to download image ${i}:`, err.message);
+//             return false;
+//           });
+
+//           downloadPromises.push(downloadPromise);
+//         }
+
+//         // Wait for all downloads
+//         const downloadResults = await Promise.all(downloadPromises);
+//         const successfulDownloads = downloadResults.filter(result => result === true).length;
+
+//         console.log(`📥 Downloaded ${successfulDownloads}/${afterPhotos.length} images`);
+
+//         if (successfulDownloads > 0) {
+//           const aiResponse = await axios.post(
+//             "https://pugarch-c-score-369586418873.europe-west1.run.app/predict",
+//             formData,
+//             {
+//               headers: {
+//                 ...formData.getHeaders(),
+//                 'User-Agent': 'CleanerReview-AIService/1.0'
+//               },
+//               timeout: 30000 // Longer timeout for file upload
+//             }
+//           );
+
+//           if (aiResponse.data && Array.isArray(aiResponse.data)) {
+//             scoreData = aiResponse.data;
+//             processingMethod = 'File Upload';
+//             console.log('✅ AI scoring successful with file upload');
+//           } else {
+//             throw new Error('Invalid AI response format');
+//           }
+//         } else {
+//           throw new Error('Failed to download any images');
+//         }
+
+//       } catch (downloadError) {
+//         console.log('❌ Method 2 failed:', downloadError.message);
+//         throw downloadError; // Will trigger fake score generation
+//       }
+//     }
+
+//     // Process real AI results
+//     console.log(`🎯 Processing ${scoreData.length} AI scores via ${processingMethod}`);
+//     await saveScoresToDatabase(scoreData, review);
+//     console.log('✅ Real AI hygiene scores saved for review:', review.id);
+
+//   } catch (aiError) {
+//     // ✅ Fallback: Generate and save fake scores
+//     console.error('🔴 AI Scoring completely failed:', {
+//       message: aiError.message,
+//       status: aiError.response?.status,
+//       statusText: aiError.response?.statusText
+//     });
+
+//     try {
+//       console.log('🎲 Generating fake scores as fallback...');
+//       const fakeScores = generateFakeScores(afterPhotos);
+
+//       console.log('💾 Saving fake scores to database...');
+//       await saveScoresToDatabase(fakeScores, review);
+
+//       console.log('✅ Fake hygiene scores saved successfully for demo purposes');
+
+//     } catch (fakeError) {
+//       console.error('🔴 Critical: Failed to save fake scores:', {
+//         message: fakeError.message,
+//         stack: fakeError.stack
+//       });
+//     }
+//   }
+// }
