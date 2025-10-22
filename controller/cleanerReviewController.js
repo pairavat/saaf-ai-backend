@@ -936,10 +936,13 @@ export async function completeCleanerReview(req, res) {
     //   company_id: review?.company_id?.toString(),
     // };
 
+    // ✅ Convert BigInts safely for JSON response
+    const serialized = stringifyBigInts(updatedReview);
+
     res.json({
-      status: "success",
-      message: "Review completed successfully",
-      data: review,
+      status: 'success',
+      message: 'Review completed successfully',
+      data: serialized,
     });
 
     // ✅ AI scoring with comprehensive error handling
@@ -963,47 +966,67 @@ export async function completeCleanerReview(req, res) {
 export const processHygieneScoring = async (images) => {
   try {
     if (!images || images.length === 0) {
-      console.warn('No images provided for scoring.');
+      console.warn('⚠️ No images provided for scoring.');
       return 0;
     }
 
-    const AI_URL = 'https://pugarch-c-score-776087882401.europe-west1.run.app/predict'; // 👈 AI endpoint
+    const AI_URL = 'https://pugarch-c-score-776087882401.europe-west1.run.app/predict';
+    const formData = new FormData();
 
-    let response;
+    console.log(`🧠 Downloading and attaching ${images.length} images for scoring...`);
 
-    // Check if images are buffers (from multer) or URLs (strings)
-    const isBufferArray = typeof images[0] === 'object' && images[0].buffer;
+    // 1️⃣ Download each image as binary
+    for (let i = 0; i < images.length; i++) {
+      const url = images[i];
+      const fileName = `image_${i + 1}.jpg`;
 
-    if (isBufferArray) {
-      // ---------- CASE 1: Send binary files ----------
-      const formData = new FormData();
+      try {
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(response.data, 'binary');
 
-      images.forEach((file, index) => {
-        formData.append('images', file.buffer, {
-          filename: file.originalname || `image_${index}.jpg`,
-          contentType: file.mimetype || 'image/jpeg',
-        });
-      });
-
-      response = await axios.post(AI_URL, formData, {
-        headers: formData.getHeaders(),
-        maxBodyLength: Infinity,
-      });
-    } else {
-      // ---------- CASE 2: Send image URLs ----------
-      response = await axios.post(AI_URL, {
-        images: images, // array of Cloudinary URLs
-      });
+        // 2️⃣ Attach each buffer to FormData as a file
+        formData.append('images', buffer, { filename: fileName, contentType: 'image/jpeg' });
+      } catch (downloadErr) {
+        console.error(`❌ Failed to download image ${url}:`, downloadErr.message);
+      }
     }
 
-    const score = response.data?.score ?? 0;
+    // 3️⃣ Send multipart/form-data request
+    const aiResponse = await axios.post(AI_URL, formData, {
+      headers: formData.getHeaders(),
+      maxBodyLength: Infinity,
+      timeout: 60000, // 60 seconds timeout for safety
+    });
+
+    // 4️⃣ Extract score from AI model
+    const score = aiResponse.data?.score ?? 0;
     console.log('✅ Hygiene Score Received:', score);
+
     return score;
   } catch (error) {
     console.error('❌ Error processing hygiene score:', error.message);
     return 0; // fallback score
   }
 };
+
+function stringifyBigInts(obj) {
+  if (Array.isArray(obj)) {
+    return obj.map(stringifyBigInts);
+  } else if (obj && typeof obj === 'object') {
+    const result = {};
+    for (const key in obj) {
+      const value = obj[key];
+      if (typeof value === 'bigint') {
+        result[key] = value.toString();
+      } else {
+        result[key] = stringifyBigInts(value);
+      }
+    }
+    return result;
+  }
+  return obj;
+}
+
 
 // ✅ Separate function for AI processing
 // async function processHygieneScoring(review, afterPhotos) {
