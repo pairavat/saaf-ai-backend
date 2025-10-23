@@ -975,9 +975,7 @@ export const processHygieneScoring = async (images) => {
       "https://pugarch-c-score-776087882401.europe-west1.run.app/predict";
     const formData = new FormData();
 
-    console.log(
-      `🧠 Downloading and attaching ${images.length} images for scoring...`
-    );
+    console.log(`🧠 Downloading and attaching ${images.length} images for scoring...`);
 
     // 1️⃣ Download each image as binary
     for (let i = 0; i < images.length; i++) {
@@ -994,10 +992,7 @@ export const processHygieneScoring = async (images) => {
           contentType: "image/jpeg",
         });
       } catch (downloadErr) {
-        console.error(
-          `❌ Failed to download image ${url}:`,
-          downloadErr.message
-        );
+        console.error(`❌ Failed to download image ${url}:`, downloadErr.message);
       }
     }
 
@@ -1005,18 +1000,33 @@ export const processHygieneScoring = async (images) => {
     const aiResponse = await axios.post(AI_URL, formData, {
       headers: formData.getHeaders(),
       maxBodyLength: Infinity,
-      timeout: 60000, // 60 seconds timeout for safety
+      timeout: 60000, // 60 seconds
     });
 
-    // 4️⃣ Extract score from AI model
-    const score = aiResponse.data?.score ?? 0;
-    console.log("✅ Hygiene Score Received:", score);
-    console.log("AI Response: ", aiResponse.data);
+    // 4️⃣ Extract score safely from AI response
+    const responseData = aiResponse.data;
 
-    return score;
+    let finalScore = 0;
+
+    if (Array.isArray(responseData) && responseData.length > 0) {
+      // Option A: average all scores if multiple images
+      const totalScore = responseData.reduce(
+        (sum, item) => sum + (item.score || 0),
+        0
+      );
+      finalScore = Math.round(totalScore / responseData.length);
+    } else if (typeof responseData === "object" && "score" in responseData) {
+      // Single object response
+      finalScore = responseData.score;
+    }
+
+    console.log("✅ Hygiene Score Received:", finalScore);
+    console.log("AI Response:", JSON.stringify(responseData, null, 2));
+
+    return finalScore;
   } catch (error) {
     console.error("❌ Error processing hygiene score:", error.message);
-    return 0; // fallback score
+    return 0; // fallback
   }
 };
 
