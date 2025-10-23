@@ -1011,7 +1011,7 @@ export const processHygieneScoring = async (images) => {
     // 4️⃣ Extract score from AI model
     const score = aiResponse.data?.score ?? 0;
     console.log("✅ Hygiene Score Received:", score);
-    console.log("AI Response: ", aiResponse);
+    console.log("AI Response: ", aiResponse.data);
 
     return score;
   } catch (error) {
