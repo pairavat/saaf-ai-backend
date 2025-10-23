@@ -927,22 +927,49 @@ export async function completeCleanerReview(req, res) {
 
         const score = await processHygieneScoring(afterPhotos);
 
-         // ✅ Force numeric and finite
-    const numericScore = Number.parseFloat(score);
-    const safeScore = Number.isFinite(numericScore) ? numericScore : 0;
+        // ✅ Force numeric and finite
+        const numericScore = Number.parseFloat(score) || 0;
+        // const safeScore = Number.isFinite(numericScore) ? numericScore : 0;
 
-    console.log("🧮 Final score before DB:", safeScore, typeof safeScore);
+        console.log(
+          "🧮 Final score before DB:",
+          numericScore,
+          typeof numericScore
+        );
+
+        // 2️⃣ Get review details for metadata
+        const reviewData = await prisma.cleaner_review.findUnique({
+          where: { id: BigInt(id) },
+          select: {
+            location_id: true,
+            cleaner_user_id: true,
+            company_id: true,
+          },
+        });
 
         await prisma.cleaner_review.update({
           where: { id: BigInt(id) },
           data: {
-            score: safeScore,
+            score: numericScore,
             status: "completed",
             updated_at: new Date().toISOString(),
           },
         });
 
         console.log(`✅ Review ${id} scored successfully: ${score}`);
+
+        // 4️⃣ Insert hygiene_scores record
+        // (You can choose the first photo or leave image_url null if not needed)
+        await prisma.hygiene_scores.create({
+          data: {
+            location_id: reviewData.location_id,
+            score: numericScore,
+            details: { method: "AI Hygiene Model" }, // optional metadata
+            image_url: afterPhotos[0] || null,
+            inspected_at: new Date(),
+            created_by: reviewData.cleaner_user_id,
+          },
+        });
       } catch (bgError) {
         console.error(
           `❌ Background scoring failed for review ${id}:`,
@@ -981,7 +1008,9 @@ export const processHygieneScoring = async (images) => {
       "https://pugarch-c-score-776087882401.europe-west1.run.app/predict";
     const formData = new FormData();
 
-    console.log(`🧠 Downloading and attaching ${images.length} images for scoring...`);
+    console.log(
+      `🧠 Downloading and attaching ${images.length} images for scoring...`
+    );
 
     // 1️⃣ Download each image as binary
     for (let i = 0; i < images.length; i++) {
@@ -998,7 +1027,10 @@ export const processHygieneScoring = async (images) => {
           contentType: "image/jpeg",
         });
       } catch (downloadErr) {
-        console.error(`❌ Failed to download image ${url}:`, downloadErr.message);
+        console.error(
+          `❌ Failed to download image ${url}:`,
+          downloadErr.message
+        );
       }
     }
 
