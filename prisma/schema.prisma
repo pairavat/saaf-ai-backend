@@ -174,7 +174,7 @@ model cleaner_review {
   after_photo     String[]
   status          String    @default("ongoing")
   company_id      BigInt?
-  score           Int?      // ✅ Nullable integer field
+  score           Float?      // ✅ Nullable integer field
   
   // ✅ Add foreign key relationships
   cleaner_user users?     @relation("CleanerReviews", fields: [cleaner_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
