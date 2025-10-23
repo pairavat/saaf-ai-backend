@@ -927,10 +927,13 @@ export async function completeCleanerReview(req, res) {
 
         const score = await processHygieneScoring(afterPhotos);
 
+         // ✅ Ensure numeric type
+        const numericScore = Number(score) || 0;
+
         await prisma.cleaner_review.update({
           where: { id: BigInt(id) },
           data: {
-            score,
+            score: numericScore,
             status: "completed",
             updated_at: new Date().toISOString(),
           },
