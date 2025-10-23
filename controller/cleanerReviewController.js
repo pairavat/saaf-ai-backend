@@ -1008,9 +1008,9 @@ export const processHygieneScoring = async (images) => {
       "https://pugarch-c-score-776087882401.europe-west1.run.app/predict";
     const formData = new FormData();
 
-    console.log(
-      `🧠 Downloading and attaching ${images.length} images for scoring...`
-    );
+    // console.log(
+    //   `🧠 Downloading and attaching ${images.length} images for scoring...`
+    // );
 
     // 1️⃣ Download each image as binary
     for (let i = 0; i < images.length; i++) {
@@ -1052,14 +1052,16 @@ export const processHygieneScoring = async (images) => {
         (sum, item) => sum + (item.score || 0),
         0
       );
-      finalScore = Math.round(totalScore / responseData.length);
+      // finalScore = Math.round(totalScore / responseData.length);
+      finalScore = parseFloat((totalScore / responseData.length).toFixed(2));
+
     } else if (typeof responseData === "object" && "score" in responseData) {
       // Single object response
       finalScore = responseData.score;
     }
 
     console.log("✅ Hygiene Score Received:", finalScore);
-    console.log("AI Response:", JSON.stringify(responseData, null, 2));
+    // console.log("AI Response:", JSON.stringify(responseData, null, 2));
 
     return finalScore;
   } catch (error) {
