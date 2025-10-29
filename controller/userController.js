@@ -1,22 +1,20 @@
 import prisma from "../config/prismaClient.mjs";
 import bcrypt from "bcryptjs";
-import express from 'express';
+import express from "express";
 
 export async function getUser(req, res) {
-
   try {
-
     const { companyId } = req.query;
 
-    console.log(companyId, "companyId")
+    console.log(companyId, "companyId");
     const users = await prisma.users.findMany({
       where: {
         company_id: companyId,
       },
 
       include: {
-        role: true
-      }
+        role: true,
+      },
     });
     // console.log(users, "users");
 
@@ -31,10 +29,36 @@ export async function getUser(req, res) {
     res.json(usersWithStringIds);
   } catch (err) {
     console.error(err);
-    res.status(500).send({msg: "Error fetching users", err});
+    res.status(500).send({ msg: "Error fetching users", err });
   }
 }
 
+export async function getAllUsers(req, res) {
+  try {
+    // const { companyId } = req.query;
+
+    // console.log(companyId, "companyId");
+    const users = await prisma.users.findMany({
+      include: {
+        role: true,
+      },
+    });
+    // console.log(users, "users");
+
+    // Convert BigInt to string
+    const usersWithStringIds = users.map((user) => ({
+      ...user,
+      id: user.id.toString(),
+      company_id: user.company_id?.toString() || null,
+    }));
+
+    console.log(usersWithStringIds, "ids");
+    res.json(usersWithStringIds);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ msg: "Error fetching users", err });
+  }
+}
 
 // export async function getUserById(req, res) {
 //   try {
@@ -139,13 +163,11 @@ export async function getUser(req, res) {
 //   }
 // }
 
-
-
 // ✅ ALTERNATIVE: Manual conversion for better control
 export async function getUserById(req, res) {
   try {
     const { id } = req.params;
-    console.log('Getting user by ID:', id);
+    console.log("Getting user by ID:", id);
 
     const user = await prisma.users.findUnique({
       where: { id: BigInt(id) },
@@ -155,10 +177,10 @@ export async function getUserById(req, res) {
         location_assignments: {
           where: { is_active: true },
           include: {
-            location: true
-          }
-        }
-      }
+            location: true,
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -179,43 +201,51 @@ export async function getUserById(req, res) {
       updated_at: user.updated_at,
 
       // Role data
-      role: user.role ? {
-        id: user.role.id,
-        name: user.role.name,
-        description: user.role.description
-      } : null,
+      role: user.role
+        ? {
+            id: user.role.id,
+            name: user.role.name,
+            description: user.role.description,
+          }
+        : null,
 
-      // Company data  
-      companies: user.companies ? {
-        id: user.companies.id.toString(), // ✅ Convert company BigInt
-        name: user.companies.name,
-        description: user.companies.description
-      } : null,
+      // Company data
+      companies: user.companies
+        ? {
+            id: user.companies.id.toString(), // ✅ Convert company BigInt
+            name: user.companies.name,
+            description: user.companies.description,
+          }
+        : null,
 
       // Location assignments
-      location_assignments: user.location_assignments?.map(assignment => ({
-        id: assignment.id.toString(),
-        location_id: assignment.location_id.toString(),
-        user_id: assignment.user_id.toString(),
-        is_active: assignment.is_active,
-        assigned_at: assignment.assigned_at,
-        location: assignment.location ? {
-          id: assignment.location.id.toString(),
-          name: assignment.location.name,
-          latitude: assignment.location.latitude,
-          longitude: assignment.location.longitude
-        } : null
-      })) || []
+      location_assignments:
+        user.location_assignments?.map((assignment) => ({
+          id: assignment.id.toString(),
+          location_id: assignment.location_id.toString(),
+          user_id: assignment.user_id.toString(),
+          is_active: assignment.is_active,
+          assigned_at: assignment.assigned_at,
+          location: assignment.location
+            ? {
+                id: assignment.location.id.toString(),
+                name: assignment.location.name,
+                latitude: assignment.location.latitude,
+                longitude: assignment.location.longitude,
+              }
+            : null,
+        })) || [],
     };
 
-    console.log('User found:', safeUser.name);
+    console.log("User found:", safeUser.name);
     res.json(safeUser);
   } catch (err) {
-    console.error('Error in getUserById:', err);
-    res.status(500).json({ message: "Error fetching user", error: err.message });
+    console.error("Error in getUserById:", err);
+    res
+      .status(500)
+      .json({ message: "Error fetching user", error: err.message });
   }
 }
-
 
 // // Handles POST /api/users
 // export const createUser = async (req, res) => {
@@ -337,14 +367,14 @@ export async function getUserById(req, res) {
 // };
 
 export const createUser = async (req, res) => {
-  console.log('in create user', req.body);
-  
+  console.log("in create user", req.body);
+
   try {
     const { password, location_ids = [], company_id, ...data } = req.body;
     // Extract company_id from the body, not query
 
     console.log(company_id, "company_id from body");
-    
+
     if (!password) {
       return res.status(400).json({ message: "Password is required" });
     }
@@ -353,16 +383,18 @@ export const createUser = async (req, res) => {
       return res.status(400).json({ message: "Company ID is required" });
     }
 
-    console.log('Hashing password...');
+    console.log("Hashing password...");
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    console.log('Creating user with company_id:', company_id);
+    console.log("Creating user with company_id:", company_id);
 
     // Helper function to serialize BigInt values
     const serializeBigInt = (obj) => {
-      return JSON.parse(JSON.stringify(obj, (key, value) =>
-        typeof value === 'bigint' ? value.toString() : value
-      ));
+      return JSON.parse(
+        JSON.stringify(obj, (key, value) =>
+          typeof value === "bigint" ? value.toString() : value
+        )
+      );
     };
 
     const newUser = await prisma.users.create({
@@ -387,60 +419,61 @@ export const createUser = async (req, res) => {
                 id: true,
                 name: true,
                 // address: true,
-              }
-            }
-          }
-        }
-      }
+              },
+            },
+          },
+        },
+      },
     });
 
-    console.log('User created successfully:', newUser.id);
+    console.log("User created successfully:", newUser.id);
 
     // Serialize the response to handle BigInt values
     const safeUser = serializeBigInt({
       ...newUser,
       id: newUser.id.toString(),
       company_id: newUser.company_id?.toString(),
-      location_assignments: newUser.location_assignments?.map(assignment => ({
+      location_assignments: newUser.location_assignments?.map((assignment) => ({
         ...assignment,
         location_id: assignment.location_id.toString(),
         user_id: assignment.user_id.toString(),
-        location: assignment.location ? {
-          ...assignment.location,
-          id: assignment.location.id.toString()
-        } : null
-      }))
+        location: assignment.location
+          ? {
+              ...assignment.location,
+              id: assignment.location.id.toString(),
+            }
+          : null,
+      })),
     });
 
-    console.log('Serialized user data:', safeUser);
+    console.log("Serialized user data:", safeUser);
     res.status(201).json(safeUser);
-
   } catch (error) {
-    console.error('Error in createUser:', error);
+    console.error("Error in createUser:", error);
 
     // Handle Prisma unique constraint violations
-    if (error.code === 'P2002') {
-      const fieldName = error.meta?.target?.join(', ') || 'field';
+    if (error.code === "P2002") {
+      const fieldName = error.meta?.target?.join(", ") || "field";
       return res.status(409).json({
         message: `User with this ${fieldName} already exists.`,
-        code: 'DUPLICATE_ENTRY'
+        code: "DUPLICATE_ENTRY",
       });
     }
 
     // Handle foreign key constraint violations
-    if (error.code === 'P2003') {
+    if (error.code === "P2003") {
       return res.status(400).json({
         message: "Invalid company ID or location ID provided.",
-        code: 'INVALID_REFERENCE'
+        code: "INVALID_REFERENCE",
       });
     }
 
     // Handle other Prisma errors
-    if (error.code?.startsWith('P')) {
+    if (error.code?.startsWith("P")) {
       return res.status(400).json({
         message: "Database constraint violation.",
         code: error.code,
-        detail: error.message
+        detail: error.message,
       });
     }
 
@@ -448,17 +481,14 @@ export const createUser = async (req, res) => {
     res.status(500).json({
       message: "Error creating user",
       error: error.message,
-      code: 'INTERNAL_ERROR'
+      code: "INTERNAL_ERROR",
     });
   }
 };
 
-
-
 // --- UPDATE USER ---
 // Handles PUT /api/users/:id
 export const updateUser = async (req, res) => {
-
   const userId = BigInt(req.params.id);
   try {
     const { password, location_ids, ...data } = req.body;
@@ -472,7 +502,8 @@ export const updateUser = async (req, res) => {
     const updatedUser = await prisma.$transaction(async (tx) => {
       const user = await tx.users.update({ where: { id: userId }, data });
 
-      if (location_ids) { // Only update locations if the array is provided
+      if (location_ids) {
+        // Only update locations if the array is provided
         await tx.locationAssignment.updateMany({
           where: { user_id: userId },
           data: { is_active: false },
@@ -481,7 +512,12 @@ export const updateUser = async (req, res) => {
         if (location_ids.length > 0) {
           for (const locId of location_ids) {
             await tx.locationAssignment.upsert({
-              where: { location_id_user_id: { user_id: userId, location_id: BigInt(locId) } },
+              where: {
+                location_id_user_id: {
+                  user_id: userId,
+                  location_id: BigInt(locId),
+                },
+              },
               update: { is_active: true },
               create: { user_id: userId, location_id: BigInt(locId) },
             });
@@ -491,23 +527,30 @@ export const updateUser = async (req, res) => {
       return user;
     });
 
-    const safeUser = JSON.parse(JSON.stringify(updatedUser, (key, value) =>
-      typeof value === 'bigint' ? value.toString() : value
-    ));
-
+    const safeUser = JSON.parse(
+      JSON.stringify(updatedUser, (key, value) =>
+        typeof value === "bigint" ? value.toString() : value
+      )
+    );
 
     res.status(200).json({
       ...safeUser,
-      birthdate: (safeUser?.birthdate) ? new Date(safeUser?.birthdate) : null
+      birthdate: safeUser?.birthdate ? new Date(safeUser?.birthdate) : null,
     });
   } catch (error) {
-    if (error.code === 'P2002') {
-      return res.status(409).json({ message: `User with this ${error.meta.target.join(', ')} already exists.` });
+    if (error.code === "P2002") {
+      return res.status(409).json({
+        message: `User with this ${error.meta.target.join(
+          ", "
+        )} already exists.`,
+      });
     }
     console.log(error, "error in update users");
-    res.status(500).json({ message: "Error updating user", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error updating user", error: error.message });
   }
-}
+};
 // --- DELETE USER ---
 // Handles DELETE /api/users/:id
 
@@ -517,6 +560,8 @@ export const deleteUser = async (req, res) => {
     await prisma.users.delete({ where: { id: userId } });
     res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Error deleting user", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error deleting user", error: error.message });
   }
-}
+};

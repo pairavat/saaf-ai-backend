@@ -29,11 +29,12 @@ model companies {
   created_at       DateTime?          @default(now()) @db.Timestamp(6)
   updated_at       DateTime?          @default(now()) @db.Timestamp(6)
   status           Boolean            @default(true)
+  deletedAt        DateTime?
+  cleaner_review   cleaner_review[]   @relation("CompanyReviews")
   location_types   location_types[]
   locations        locations[]
   registered_users registered_users[]
   users            users[]
-  cleaner_review   cleaner_review[]   @relation("CompanyReviews")
 }
 
 model hygiene_scores {
@@ -51,29 +52,38 @@ model hygiene_scores {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model locations {
-  id                  BigInt                   @id @default(autoincrement())
-  name                String                   @db.VarChar(255)
-  parent_id           BigInt?
-  company_id          BigInt?
-  latitude            Float?
-  longitude           Float?
-  metadata            Json?                    @db.Json
-  created_at          DateTime?                @default(now()) @db.Timestamp(6)
-  updated_at          DateTime?                @default(now()) @db.Timestamp(6)
-  type_id             BigInt?
-  options             Json?                    @default("{}")
-  lang_preference     String?                  @db.VarChar(255)
-  images              String[]
-  geom                Unsupported("geometry")?
-  assigned_users      LocationAssignment[]
-  cleaner_assignments cleaner_assignments[]
-  hygiene_scores      hygiene_scores[]
-  companies           companies?               @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  locations           locations?               @relation("locationsTolocations", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  other_locations     locations[]              @relation("locationsTolocations")
-  location_types      location_types?          @relation(fields: [type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  // ✅ Add cleaner review relationship
-  cleaner_reviews     cleaner_review[]         @relation("LocationReviews")
+  id                     BigInt                   @id @default(autoincrement())
+  name                   String                   @db.VarChar(255)
+  parent_id              BigInt?
+  company_id             BigInt?
+  latitude               Float?
+  longitude              Float?
+  metadata               Json?                    @db.Json
+  created_at             DateTime?                @default(now()) @db.Timestamp(6)
+  updated_at             DateTime?                @default(now()) @db.Timestamp(6)
+  type_id                BigInt?
+  options                Json?                    @default("{}")
+  lang_preference        String?                  @db.VarChar(255)
+  geom                   Unsupported("geometry")?
+  images                 String[]
+  deletedAt              DateTime?
+  address                String?
+  average_cleaning_score Float?
+  city                   String?
+  current_cleaning_score Float?
+  dist                   String?
+  status                 Boolean?
+  user_review_score      Float?
+  pincode                String?
+  state                  String?
+  assigned_users         LocationAssignment[]
+  cleaner_assignments    cleaner_assignments[]
+  cleaner_reviews        cleaner_review[]         @relation("LocationReviews")
+  hygiene_scores         hygiene_scores[]
+  companies              companies?               @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  locations              locations?               @relation("locationsTolocations", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_locations        locations[]              @relation("locationsTolocations")
+  location_types         location_types?          @relation(fields: [type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([geom], map: "idx_locations_geom", type: Gist)
 }
@@ -87,6 +97,7 @@ model location_types {
   created_at           DateTime?        @default(now()) @db.Timestamp(6)
   updated_at           DateTime?        @default(now()) @db.Timestamp(6)
   is_toilet            Boolean?
+  deletedAt            DateTime?
   companies            companies?       @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   location_types       location_types?  @relation("location_typesTolocation_types", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_location_types location_types[] @relation("location_typesTolocation_types")
@@ -135,15 +146,16 @@ model users {
   age                               Int?
   birthdate                         DateTime?             @db.Date
   role_id                           Int?
+  deletedAt                         DateTime?
   location_assignments              LocationAssignment[]
   activity_logs                     activity_logs[]
   cleaner_assignments_as_cleaner    cleaner_assignments[] @relation("CleanerUser")
   cleaner_assignments_as_supervisor cleaner_assignments[] @relation("Supervisor")
+  cleaner_reviews                   cleaner_review[]      @relation("CleanerReviews")
   hygiene_scores                    hygiene_scores[]
   sessions                          sessions[]
   companies                         companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   role                              Role?                 @relation(fields: [role_id], references: [id])
-  cleaner_reviews                   cleaner_review[]      @relation("CleanerReviews")
 }
 
 model configurations {
@@ -158,13 +170,13 @@ model configurations {
 }
 
 model cleaner_review {
-  id              BigInt    @id @default(autoincrement())
+  id              BigInt     @id @default(autoincrement())
   name            String
   latitude        Float?
   longitude       Float?
   address         String?
-  created_at      DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+  created_at      DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?  @default(now()) @db.Timestamptz(6)
   location_id     BigInt?
   cleaner_user_id BigInt?
   tasks           String[]
@@ -172,14 +184,12 @@ model cleaner_review {
   final_comment   String?
   before_photo    String[]
   after_photo     String[]
-  status          String    @default("ongoing")
+  status          String     @default("ongoing")
   company_id      BigInt?
-  score           Float?      // ✅ Nullable integer field
-  
-  // ✅ Add foreign key relationships
-  cleaner_user users?     @relation("CleanerReviews", fields: [cleaner_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  location     locations? @relation("LocationReviews", fields: [location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  company      companies? @relation("CompanyReviews", fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  score           Float?
+  cleaner_user    users?     @relation("CleanerReviews", fields: [cleaner_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company         companies? @relation("CompanyReviews", fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  location        locations? @relation("LocationReviews", fields: [location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model user_review {
@@ -196,6 +206,8 @@ model user_review {
   updated_at  DateTime? @default(now()) @db.Timestamptz(6)
   longitude   Float?
   latitude    Float?
+  ai_score    Float?
+  company_id  BigInt?
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
