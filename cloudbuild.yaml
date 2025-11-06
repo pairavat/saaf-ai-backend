@@ -26,6 +26,20 @@ steps:
       '--quiet'
     ]
 
+      # Step 4 — Post-deploy configuration (optional)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gcloud run services update saaf-ai-backend \
+          --region=asia-south1 \
+          --min-instances=1 \
+          --cpu=1 \
+          --memory=512Mi \
+          --execution-environment=gen2 \
+          --set-env-vars=GCS_BUCKET_NAME=saaf-ai-images-$PROJECT_ID
+
 options:
   logging: CLOUD_LOGGING_ONLY
 
