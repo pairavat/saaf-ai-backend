@@ -4,7 +4,7 @@
 FROM node:20-alpine AS builder
 
 # Set working directory
-WORKDIR /app
+WORKDIR /
 
 # Install dependencies required for Prisma
 RUN apk add --no-cache openssl python3 make g++
@@ -52,7 +52,7 @@ ENV PORT=8080
 
 # Health check (optional but recommended for Cloud Run)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD wget -qO- http://localhost:${PORT}/health || exit 1
+    CMD wget -qO- http://localhost:${PORT}/health || exit 1
 
 # Expose the port expected by Cloud Run and Render
 EXPOSE 8080
