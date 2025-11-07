@@ -516,11 +516,29 @@ export async function createCleanerReview(req, res) {
 
 export async function completeCleanerReview(req, res) {
   try {
-    const { final_comment, id } = req.body;
+    const { final_comment, id, tasks } = req.body;
     // const afterPhotos = req.uploadedFiles?.after_photo || [];
     const afterPhotos = (req.uploadedFiles?.after_photo || []).filter(
       (url) => !!url
     );
+
+    let parsedTasks = [];
+    if (tasks) {
+      if (Array.isArray(tasks)) {
+        parsedTasks = tasks.map(String);
+      } else if (typeof tasks === "string") {
+        try {
+          const parsed = JSON.parse(tasks);
+          if (Array.isArray(parsed)) {
+            parsedTasks = parsed.map(String);
+          } else {
+            parsedTasks = [String(parsed)];
+          }
+        } catch (e) {
+          parsedTasks = tasks.split(",").map((task) => String(task).trim());
+        }
+      }
+    }
 
     // 1️⃣ Update the review immediately as "processing"
     const review = await prisma.cleaner_review.update({
@@ -530,6 +548,7 @@ export async function completeCleanerReview(req, res) {
         final_comment: final_comment || null,
         status: "processing",
         updated_at: new Date().toISOString(),
+        tasks: parsedTasks
       },
     });
 
