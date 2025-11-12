@@ -579,6 +579,7 @@ export async function completeCleanerReview(req, res) {
           where: { id: BigInt(id) },
           data: {
             score: numericScore,
+            original_score: numericScore,
             status: "completed",
             updated_at: new Date().toISOString(),
           },
@@ -592,6 +593,7 @@ export async function completeCleanerReview(req, res) {
           data: {
             location_id: reviewData.location_id,
             score: numericScore,
+            original_score: numericScore,
             details: { method: "AI Hygiene Model" }, // optional metadata
             image_url: afterPhotos[0] || null,
             inspected_at: new Date(),
