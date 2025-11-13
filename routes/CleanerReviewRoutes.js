@@ -27,9 +27,9 @@ clean_review_Router.get("/task/:task_id", getCleanerReviewsByTaskId);
 // Start review (before photos)
 clean_review_Router.post(
   "/initiated",
-  upload.fields([{ name: "before_photo", maxCount: 5 }]),
+  upload.fields([{ name: "before_photo", maxCount: 20 }]),
   processAndUploadImages([
-    { fieldName: "before_photo", folder: "before_photos", maxCount: 5 }
+    { fieldName: "before_photo", folder: "before_photos", maxCount: 20 }
   ]),
   debugFields,
   createCleanerReview
@@ -38,9 +38,9 @@ clean_review_Router.post(
 // Complete review (after photos)
 clean_review_Router.post(
   "/completed",
-  upload.fields([{ name: "after_photo", maxCount: 5 }]),
+  upload.fields([{ name: "after_photo", maxCount: 20 }]),
   processAndUploadImages([
-    { fieldName: "after_photo", folder: "after_photos", maxCount: 5 }
+    { fieldName: "after_photo", folder: "after_photos", maxCount: 20 }
   ]),
   debugFields,
   completeCleanerReview
