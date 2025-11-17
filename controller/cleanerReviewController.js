@@ -168,27 +168,7 @@ export const getCleanerReviewsById = async (req, res) => {
             },
           },
         },
-        location: {
-          select: {
-            id: true,
-            name: true,
-            latitude: true,
-            longitude: true,
-            metadata: true,
-            location_types: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-            locations: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
+        location: {},
         company: {
           select: {
             id: true,
