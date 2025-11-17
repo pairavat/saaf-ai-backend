@@ -555,31 +555,35 @@ export async function completeCleanerReview(req, res) {
           },
         });
 
+        // 4️⃣ Insert hygiene_scores record and capture the result
+        const hygieneScore = await prisma.hygiene_scores.create({
+          data: {
+            location_id: reviewData.location_id,
+            score: numericScore,
+            original_score: numericScore,
+            details: { method: "AI Hygiene Model" },
+            image_url: afterPhotos[0] || null,
+            inspected_at: new Date(),
+            created_by: reviewData.cleaner_user_id,
+            company_id: reviewData.company_id,
+          },
+        });
+
+        // hygieneScore.id is now available 🚀
+
+        // 5️⃣ Update cleaner_review with hygiene_score_id
         await prisma.cleaner_review.update({
           where: { id: BigInt(id) },
           data: {
             score: numericScore,
             original_score: numericScore,
+            hygiene_score_id: hygieneScore.id, // ← add this
             status: "completed",
             updated_at: new Date().toISOString(),
           },
         });
 
         // console.log(`✅ Review ${id} scored successfully: ${score}`);
-
-        // 4️⃣ Insert hygiene_scores record
-        // (You can choose the first photo or leave image_url null if not needed)
-        await prisma.hygiene_scores.create({
-          data: {
-            location_id: reviewData.location_id,
-            score: numericScore,
-            original_score: numericScore,
-            details: { method: "AI Hygiene Model" }, // optional metadata
-            image_url: afterPhotos[0] || null,
-            inspected_at: new Date(),
-            created_by: reviewData.cleaner_user_id,
-          },
-        });
       } catch (bgError) {
         console.error(
           `❌ Background scoring failed for review ${id}:`,
@@ -614,8 +618,11 @@ export const processHygieneScoring = async (images) => {
       return 0;
     }
 
+    // const AI_URL =
+    //   "https://pugarch-c-score-776087882401.europe-west1.run.app/predict";
+
     const AI_URL =
-      "https://pugarch-c-score-776087882401.europe-west1.run.app/predict";
+      "https://pugarch-c-score-v2-776087882401.europe-west1.run.app/predict";
     const formData = new FormData();
 
     // console.log(
