@@ -536,7 +536,7 @@ export async function completeCleanerReview(req, res) {
         const score = await processHygieneScoring(afterPhotos);
 
         // ✅ Force numeric and finite
-        const numericScore = Number.parseFloat(score) || 0;
+        let numericScore = Number.parseFloat(score) || 0;
 
         if (numericScore >= 10) {
           // Generate a random float between 4 and 8
