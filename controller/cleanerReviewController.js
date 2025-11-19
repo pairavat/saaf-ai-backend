@@ -540,7 +540,7 @@ export async function completeCleanerReview(req, res) {
 
         if (numericScore >= 10) {
           // Random float between 6.5 and 9
-          numericScore = 6.5 + Math.random() * (9 - 6.5);
+          numericScore = +(6.5 + Math.random() * (9 - 6.5)).toFixed(2);
         }
         // const safeScore = Number.isFinite(numericScore) ? numericScore : 0;
 
