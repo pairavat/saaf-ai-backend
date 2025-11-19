@@ -538,9 +538,10 @@ export async function completeCleanerReview(req, res) {
         // ✅ Force numeric and finite
         let numericScore = Number.parseFloat(score) || 0;
 
-        if (numericScore >= 10) {
+        if (numericScore > 10) {
           // Random float between 6.5 and 9
-          numericScore = +(6.5 + Math.random() * (9 - 6.5)).toFixed(2);
+          // numericScore = +(6.5 + Math.random() * (9 - 6.5)).toFixed(2);
+          numericScore = 10;
         }
         // const safeScore = Number.isFinite(numericScore) ? numericScore : 0;
 
