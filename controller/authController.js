@@ -1,5 +1,6 @@
 import prisma from "../config/prismaClient.mjs";
 import bcrypt from "bcryptjs";
+import { generateToken } from "../utils/jwt.js";
 
 export const registerUser = async (req, res) => {
   const { name, email, phone, password, role_id, company_id, age, birthdate } =
@@ -55,7 +56,8 @@ export const registerUser = async (req, res) => {
 };
 
 export const loginUser = async (req, res) => {
-  const { phone, password } = req.body;
+  console.log("in login controller");
+  const { phone, password, fcm_token } = req.body;
 
   if (!phone || !password) {
     return res.status(400).json({ error: "Phone and password are required." });
@@ -65,8 +67,15 @@ export const loginUser = async (req, res) => {
     const user = await prisma.users.findUnique({
       where: { phone },
     });
+
     // const user = await prisma.users.findUnique({ where: { phone } });
     console.log("user", user);
+
+    const serializeUser = {
+      ...user,
+      id: user?.id?.toString(),
+      company_id: user?.id?.toString(),
+    };
     if (!user) {
       return res
         .status(404)
@@ -86,6 +95,24 @@ export const loginUser = async (req, res) => {
         .json({ status: "error", message: "Password does not match !" });
     }
 
+    const token = generateToken({
+      id: serializeUser.id,
+      email: user.email,
+      role_id: user.role_id,
+      company_id: serializeUser.company_id,
+    });
+
+    const updateUserToke = await prisma.users.update({
+      where: {
+        id: serializeUser?.id,
+      },
+      data: {
+        token: token,
+        fcm_token: fcm_token,
+      },
+    });
+
+    console.log(updateUserToke, "update user");
     // For simplicity, return basic info (in production use JWT)
     res.json({
       status: "success",
@@ -98,8 +125,7 @@ export const loginUser = async (req, res) => {
         age: user.age,
         role_id: user.role_id,
         company_id: user.company_id.toString(),
-        token:
-          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwicm9sZSI6ImFkbWluIn0.X-gpybmE2KFZNPQqEY05FV70eXY4ypXHmmdDhyK0V6I",
+        token: token,
       },
     });
   } catch (err) {
