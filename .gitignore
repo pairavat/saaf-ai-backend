@@ -19,3 +19,4 @@ controller/cleanerReviewController - Copy.js
 .env.*
 !.env.example
 .vscode
+firebase/*.json
