@@ -14,6 +14,7 @@ import userRouter from "./routes/userRoutes.js";
 import companyRouter from "./routes/companyApiRoutes.js";
 import roleRouter from "./routes/roleRoutes.js";
 import registered_users_router from "./routes/registerUserApi.js";
+import notificationRouter from "./routes/notificationRoutes.js";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -34,7 +35,7 @@ const allowedOrigins = [
   "https://safai-index.vercel.app",
   "https://saaf-ai.vercel.app",
   "https://safaiindex.vercel.app",
-  "*"
+  "*",
 ];
 
 // app.use(
@@ -80,6 +81,7 @@ app.use("/api/cleaner-reviews", clean_review_Router);
 app.use("/api/users", userRouter);
 app.use("/api/companies", companyRouter);
 app.use("/api/role", roleRouter);
+app.use("/api/notifications", notificationRouter);
 
 app.use("/uploads", express.static("uploads"));
 
