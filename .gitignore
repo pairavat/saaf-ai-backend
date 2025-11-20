@@ -18,3 +18,4 @@ controller/cleanerReviewController - Copy.js
 .env.local
 .env.*
 !.env.example
+.vscode

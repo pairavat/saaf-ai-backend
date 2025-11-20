@@ -158,6 +158,7 @@ model users {
   role_id                           Int?
   deletedAt                         DateTime?
   token                             String?               @db.VarChar(255)
+  fcm_token                         String?               @db.VarChar(255)
   activity_logs                     activity_logs[]
   cleaner_assignments_as_cleaner    cleaner_assignments[] @relation("CleanerUser")
   cleaner_assignments_as_supervisor cleaner_assignments[] @relation("Supervisor")
