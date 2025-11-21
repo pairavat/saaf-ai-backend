@@ -3,16 +3,25 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// Needed because __dirname doesn't work in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load service account JSON manually
-const serviceAccountPath = path.join(
-  __dirname,
-  "safai-ai-3489a-firebase-adminsdk-fbsvc-b084ee6861.json"
-);
-const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
+// Secret Manager mount path in Cloud Run
+const gcpSecretPath = process.env.FIREBASE_ADMIN_KEY;
+
+// Local JSON path
+const localKeyPath = path.join(__dirname, "serviceAccountKey.json");
+
+// Decide which key to load
+let serviceAccount;
+
+if (gcpSecretPath && fs.existsSync(gcpSecretPath)) {
+  console.log("🔥 Using Firebase credentials from GCP Secret Manager");
+  serviceAccount = JSON.parse(fs.readFileSync(gcpSecretPath, "utf8"));
+} else {
+  console.log("💻 Using local Firebase service account");
+  serviceAccount = JSON.parse(fs.readFileSync(localKeyPath, "utf8"));
+}
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
