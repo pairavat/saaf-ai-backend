@@ -28,16 +28,13 @@ export const getAllAssignments = async (req, res) => {
     const { company_id } = req.query;
     let whereClause = {};
 
-
     if (company_id) {
-      // this approch  replace the entire where calsue object 
+      // this approch  replace the entire where calsue object
       // if more than one fiter use  whereClause.company_id = company_id
       whereClause = {
-        company_id: company_id
-      }
+        company_id: company_id,
+      };
     }
-
-
 
     const assignments = await prisma.cleaner_assignments.findMany({
       where: whereClause,
@@ -46,7 +43,7 @@ export const getAllAssignments = async (req, res) => {
     });
 
     console.log(company_id, "company_id");
-    console.log(assignments, "in ass")
+    console.log(assignments, "in ass");
     // Collect user IDs
     const userIds = assignments.map((a) => a.cleaner_user_id);
 
@@ -128,9 +125,9 @@ export const getAssignmentByCleanerUserId = async (req, res) => {
     console.log(cleanerUserId, "cleaner_user_id");
 
     const assignments = await prisma.cleaner_assignments.findMany({
-      where: { cleaner_user_id: cleanerUserId },
+      where: { cleaner_user_id: cleanerUserId, status: true },
       include: { locations: true },
-      orderBy: { id: "asc" },
+      orderBy: { name: "asc" },
     });
 
     console.log(assignments.length, assignments.length === 0);
@@ -153,8 +150,6 @@ export const getAssignmentByCleanerUserId = async (req, res) => {
   }
 };
 
-
-
 // controller/assignmentController.js (or wherever your assignment controllers are)
 
 export const getAssignmentById = async (req, res) => {
@@ -166,13 +161,13 @@ export const getAssignmentById = async (req, res) => {
     if (!id || isNaN(id)) {
       return res.status(400).json({
         status: "error",
-        message: "Invalid assignment ID provided"
+        message: "Invalid assignment ID provided",
       });
     }
 
     // Build where clause
     let whereClause = {
-      id: BigInt(id)
+      id: BigInt(id),
     };
 
     // Add company filter if provided
@@ -192,12 +187,12 @@ export const getAssignmentById = async (req, res) => {
             phone: true,
             role: {
               select: {
-                name: true
-              }
-            }
-          }
+                name: true,
+              },
+            },
+          },
         },
-        // Include location details  
+        // Include location details
         locations: {
           select: {
             id: true,
@@ -206,50 +201,53 @@ export const getAssignmentById = async (req, res) => {
             longitude: true,
             location_types: {
               select: {
-                name: true
-              }
-            }
-          }
+                name: true,
+              },
+            },
+          },
         },
         // Include supervisor details
         supervisor: {
           select: {
             id: true,
             name: true,
-            email: true
-          }
-        }
-      }
+            email: true,
+          },
+        },
+      },
     });
 
     if (!assignment) {
       return res.status(404).json({
         status: "error",
-        message: "Assignment not found"
+        message: "Assignment not found",
       });
     }
 
     // Serialize BigInt values
-    const serializedAssignment = JSON.parse(JSON.stringify(assignment, (key, value) =>
-      typeof value === 'bigint' ? value.toString() : value
-    ));
+    const serializedAssignment = JSON.parse(
+      JSON.stringify(assignment, (key, value) =>
+        typeof value === "bigint" ? value.toString() : value
+      )
+    );
 
     res.json({
       status: "success",
       data: serializedAssignment,
-      message: "Assignment retrieved successfully"
+      message: "Assignment retrieved successfully",
     });
-
   } catch (error) {
     console.error("Get assignment by ID error:", error);
     res.status(500).json({
       status: "error",
       message: "Failed to fetch assignment",
-      detail: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      detail:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Internal server error",
     });
   }
 };
-
 
 /**
  * CREATE new assignment
@@ -286,8 +284,6 @@ export const getAssignmentById = async (req, res) => {
 //   }
 // };
 
-
-
 export const createAssignment = async (req, res) => {
   console.log("in create assignmets");
   try {
@@ -302,13 +298,11 @@ export const createAssignment = async (req, res) => {
       !Array.isArray(location_ids) ||
       location_ids.length === 0
     ) {
-      return res
-        .status(400)
-        .json({
-          status: "error",
-          message:
-            "Missing required fields: cleaner_user_id, company_id, and a non-empty array of location_ids.",
-        });
+      return res.status(400).json({
+        status: "error",
+        message:
+          "Missing required fields: cleaner_user_id, company_id, and a non-empty array of location_ids.",
+      });
     }
 
     // --- Data Preparation ---
@@ -322,12 +316,10 @@ export const createAssignment = async (req, res) => {
 
     // Ensure all requested locations were found
     if (locations.length !== location_ids.length) {
-      return res
-        .status(404)
-        .json({
-          status: "error",
-          message: "One or more selected locations could not be found.",
-        });
+      return res.status(404).json({
+        status: "error",
+        message: "One or more selected locations could not be found.",
+      });
     }
 
     // Prepare the data for a bulk-creation database query
