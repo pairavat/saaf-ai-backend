@@ -17,7 +17,7 @@ steps:
         "asia-south1-docker.pkg.dev/$PROJECT_ID/node-hosting-repo/saaf-ai-backend:$COMMIT_SHA",
       ]
 
-  # Step 3 — Deploy to Cloud Run with secret mount & environment vars
+  # Step 3 — Deploy to Cloud Run
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     entrypoint: gcloud
     args: [
@@ -32,15 +32,12 @@ steps:
         "managed",
         "--allow-unauthenticated",
 
-        # Environment variables
         "--set-env-vars",
         "GCS_BUCKET_NAME=saaf-ai-images-$PROJECT_ID",
-        "--set-env-vars",
-        "FIREBASE_ADMIN_KEY_SAFAI=/secrets/firebase_admin/FIREBASE_ADMIN_KEY_SAFAI",
 
-        # Secret mount (IMPORTANT)
+        # Very important: secret injected as ENV VAR
         "--update-secrets",
-        "FIREBASE_ADMIN_KEY_SAFAI=FIREBASE_ADMIN_KEY_SAFAI:latest:/secrets/firebase_admin/FIREBASE_ADMIN_KEY_SAFAI",
+        "FIREBASE_ADMIN_KEY_SAFAI=FIREBASE_ADMIN_KEY_SAFAI:latest",
       ]
 
 options:
