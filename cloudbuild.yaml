@@ -1,46 +1,49 @@
 steps:
   # Step 1 — Build Docker image
-  - name: 'gcr.io/cloud-builders/docker'
-    args: [
-      'build',
-      '-t', 'asia-south1-docker.pkg.dev/$PROJECT_ID/node-hosting-repo/saaf-ai-backend:$COMMIT_SHA',
-      '.'
-    ]
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-t",
+        "asia-south1-docker.pkg.dev/$PROJECT_ID/node-hosting-repo/saaf-ai-backend:$COMMIT_SHA",
+        ".",
+      ]
 
   # Step 2 — Push Docker image
-  - name: 'gcr.io/cloud-builders/docker'
-    args: [
-      'push',
-      'asia-south1-docker.pkg.dev/$PROJECT_ID/node-hosting-repo/saaf-ai-backend:$COMMIT_SHA'
-    ]
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "push",
+        "asia-south1-docker.pkg.dev/$PROJECT_ID/node-hosting-repo/saaf-ai-backend:$COMMIT_SHA",
+      ]
 
-  # Step 3 — Deploy to Cloud Run
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  # Step 3 — Deploy to Cloud Run with secret mount & environment vars
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     entrypoint: gcloud
     args: [
-      'run', 'deploy', 'saaf-ai-backend',
-      '--image', 'asia-south1-docker.pkg.dev/$PROJECT_ID/node-hosting-repo/saaf-ai-backend:$COMMIT_SHA',
-      '--region', 'asia-south1',
-      '--platform', 'managed',
-      '--allow-unauthenticated',
-      '--quiet'
-    ]
+        "run",
+        "deploy",
+        "saaf-ai-backend",
+        "--image",
+        "asia-south1-docker.pkg.dev/$PROJECT_ID/node-hosting-repo/saaf-ai-backend:$COMMIT_SHA",
+        "--region",
+        "asia-south1",
+        "--platform",
+        "managed",
+        "--allow-unauthenticated",
 
-      # Step 4 — Post-deploy configuration (optional)
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        gcloud run services update saaf-ai-backend \
-          --region=asia-south1 \
-          --min-instances=1 \
-          --cpu=1 \
-          --memory=512Mi \
-          --execution-environment=gen2 \
-          --set-env-vars=GCS_BUCKET_NAME=saaf-ai-images-$PROJECT_ID
+        # Environment variables
+        "--set-env-vars",
+        "GCS_BUCKET_NAME=saaf-ai-images-$PROJECT_ID",
+        "--set-env-vars",
+        "FIREBASE_ADMIN_KEY_SAFAI=/secrets/firebase_admin/FIREBASE_ADMIN_KEY_SAFAI",
+
+        # Secret mount (IMPORTANT)
+        "--update-secrets",
+        "FIREBASE_ADMIN_KEY_SAFAI=FIREBASE_ADMIN_KEY_SAFAI:latest:/secrets/firebase_admin/FIREBASE_ADMIN_KEY_SAFAI",
+      ]
 
 options:
   logging: CLOUD_LOGGING_ONLY
 
-timeout: '1200s'
+timeout: "1200s"
