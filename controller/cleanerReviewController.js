@@ -627,8 +627,9 @@ export const processHygieneScoring = async (images) => {
     // const AI_URL =
     //   "https://pugarch-c-score-776087882401.europe-west1.run.app/predict";
 
-    const AI_URL =
-      "https://pugarch-c-score-v2-776087882401.europe-west1.run.app/predict";
+    // const AI_URL =
+    //   "https://pugarch-c-score-v2-776087882401.europe-west1.run.app/predict";
+    const AI_URL = "https://safai-ai-python-dfowh5bpha-as.a.run.app/predict";
     const formData = new FormData();
 
     // console.log(
