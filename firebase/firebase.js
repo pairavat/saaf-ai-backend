@@ -31,7 +31,7 @@ let serviceAccount;
 
 if (gcpSecretPath) {
   console.log("🔥 Using Firebase Admin SDK from GCP Secret Manager");
-  serviceAccount = gcpSecretPath;
+  serviceAccount = JSON.parse(gcpSecretPath);
 } else {
   console.log("💻 Using local Firebase Admin SDK key");
   serviceAccount = JSON.parse(fs.readFileSync(localKeyPath, "utf8"));
