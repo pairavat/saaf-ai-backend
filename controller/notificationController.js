@@ -25,3 +25,25 @@ export const sendNotification = async (req, res) => {
     return res.status(500).json({ success: false, error });
   }
 };
+
+export const sendNotificationToMany = async ({
+  tokens,
+  title,
+  body,
+  data = {},
+}) => {
+  try {
+    const message = {
+      tokens,
+      notification: { title, body },
+      data,
+    };
+
+    const response = await admin.messaging().sendEachForMulticast(message);
+
+    return { success: true, response };
+  } catch (error) {
+    console.error("FCM Error:", error);
+    return { success: false, error };
+  }
+};

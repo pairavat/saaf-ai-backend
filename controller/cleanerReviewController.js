@@ -3,7 +3,7 @@ import axios from "axios";
 import FormData from "form-data";
 import fs from "fs";
 import path from "path";
-
+import { sendNotificationToMany } from "./notificationController.js";
 // =========================================================
 // 1️⃣ GET all cleaner reviews (with filters)
 // =========================================================
@@ -476,6 +476,52 @@ export async function createCleanerReview(req, res) {
       company_id: review?.company_id?.toString(),
     };
 
+    try {
+      // 1️⃣ Fetch review metadata for notification
+      const { cleaner_user_id, location_id, company_id } = serializedData;
+
+      // 2️⃣ Fetch cleaner name
+      const cleaner = await prisma.users.findUnique({
+        where: { id: cleaner_user_id },
+        select: { name: true, fcm_token: true },
+      });
+
+      // 3️⃣ Fetch location name
+      const location = await prisma.locations.findUnique({
+        where: { id: location_id },
+        select: { name: true },
+      });
+
+      const cleanerName = cleaner?.name || "Cleaner";
+      const locationName = location?.name || "Unknown Location";
+
+      // 4️⃣ Fetch admins (role_id = 1)
+      const admins = await prisma.users.findMany({
+        where: { role_id: 1 },
+        select: { fcm_token: true },
+      });
+
+      // 5️⃣ Merge tokens (cleaner + admins)
+      let tokens = [
+        // cleaner?.fcm_token,
+        ...admins.map((u) => u.fcm_token),
+      ].filter(Boolean);
+
+      tokens = [...new Set(tokens)];
+
+      // 6️⃣ Send notification
+      if (tokens.length > 0) {
+        await sendNotificationToMany({
+          tokens,
+          title: "Task Started",
+          body: `New task started by ${cleanerName} at ${locationName}`,
+          data: { reviewId: String(serializedData.id), type: "review" },
+        });
+      }
+    } catch (e) {
+      console.error("❌ Notification Error:", e);
+    }
+
     res.status(201).json({ status: "success", data: serializedData });
   } catch (err) {
     console.error("Create Review Error:", err);
@@ -588,6 +634,58 @@ export async function completeCleanerReview(req, res) {
             updated_at: new Date().toISOString(),
           },
         });
+
+        try {
+          // 1️⃣ Fetch review metadata for notification
+          const { cleaner_user_id, location_id, company_id } = reviewData;
+
+          // 2️⃣ Fetch cleaner name
+          const cleaner = await prisma.users.findUnique({
+            where: { id: cleaner_user_id },
+            select: { name: true, fcm_token: true },
+          });
+
+          // 3️⃣ Fetch location name
+          const location = await prisma.locations.findUnique({
+            where: { id: location_id },
+            select: { name: true },
+          });
+
+          const cleanerName = cleaner?.name || "Cleaner";
+          const locationName = location?.name || "Unknown Location";
+
+          // 4️⃣ Fetch admins (role_id = 1)
+          const admins = await prisma.users.findMany({
+            where: { role_id: 1 },
+            select: { fcm_token: true },
+          });
+
+          // 5️⃣ Merge tokens (cleaner + admins)
+          let tokens = [
+            cleaner?.fcm_token,
+            ...admins.map((u) => u.fcm_token),
+          ].filter(Boolean);
+
+          tokens = [...new Set(tokens)];
+          let msg = "";
+          if (numericScore >= 8) {
+            msg = `New task completed by ${cleanerName} at ${locationName} with score ${numericScore}`;
+          } else {
+            msg = `New task completed by ${cleanerName} at ${locationName} with score ${numericScore}`;
+          }
+
+          // 6️⃣ Send notification
+          if (tokens.length > 0) {
+            await sendNotificationToMany({
+              tokens,
+              title: "Task Completed",
+              body: msg,
+              data: { reviewId: String(id), type: "review" },
+            });
+          }
+        } catch (e) {
+          console.error("❌ Notification Error:", e);
+        }
 
         // console.log(`✅ Review ${id} scored successfully: ${score}`);
       } catch (bgError) {
