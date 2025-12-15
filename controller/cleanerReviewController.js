@@ -579,7 +579,7 @@ export async function completeCleanerReview(req, res) {
       try {
         // console.log("⚙️ Background: Processing hygiene scoring for review", id);
 
-        const score = await processHygieneScoring(afterPhotos);
+        const { score, metadata } = await processHygieneScoring(afterPhotos);
 
         // ✅ Force numeric and finite
         let numericScore = Number.parseFloat(score) || 0;
@@ -613,7 +613,12 @@ export async function completeCleanerReview(req, res) {
             location_id: reviewData.location_id,
             score: numericScore,
             original_score: numericScore,
-            details: { method: "AI Hygiene Model" },
+            details: {
+              method: "AI Hygiene Model v1",
+              images_analyzed: afterPhotos.length,
+              ai_response: metadata, // 👈 FULL AI JSON
+              computed_at: new Date().toISOString(),
+            },
             image_url: afterPhotos[0] || null,
             inspected_at: new Date(),
             created_by: reviewData.cleaner_user_id,
@@ -685,6 +690,44 @@ export async function completeCleanerReview(req, res) {
           }
         } catch (e) {
           console.error("❌ Notification Error:", e);
+        }
+
+        try {
+          const lastScores = await prisma.hygiene_scores.findMany({
+            where: { location_id: reviewData.location_id },
+            orderBy: { inspected_at: "desc" },
+            take: 10,
+            select: { score: true },
+          });
+
+          // Extract numeric values only
+          const scores = lastScores
+            .map((s) => Number(s.score))
+            .filter((n) => !isNaN(n) && isFinite(n));
+
+          console.log(scores, "scores");
+
+          const avgScore =
+            scores.length > 0
+              ? scores.reduce((sum, n) => sum + n, 0) / scores.length
+              : numericScore; // fallback if first score
+
+          await prisma.locations.update({
+            where: { id: reviewData.location_id },
+            data: {
+              current_cleaning_score: Number(numericScore.toFixed(2)),
+              average_cleaning_score: Number(avgScore.toFixed(2)),
+              updated_at: new Date(),
+            },
+          });
+
+          console.log(
+            `📍 Location score updated | Current:${numericScore} Avg:${avgScore.toFixed(
+              2
+            )}`
+          );
+        } catch (err) {
+          console.error("❌ Failed to update location scores:", err);
         }
 
         // console.log(`✅ Review ${id} scored successfully: ${score}`);
@@ -784,13 +827,21 @@ export const processHygieneScoring = async (images) => {
     console.log("✅ Hygiene Score Received:", finalScore);
     // console.log("AI Response:", JSON.stringify(responseData, null, 2));
 
-    return finalScore;
+    // return finalScore;
+    return {
+      score: finalScore,
+      metadata: responseData, // 👈 store everything
+    };
   } catch (error) {
     const randomNum = Math.floor(Math.random() * (9 - 5 + 1)) + 5;
 
     console.log(randomNum);
     console.error("❌ Error processing hygiene score:", error.message);
-    return randomNum; // fallback
+    // return randomNum; // fallback
+    return {
+      score: randomNum,
+      metadata: { error: error.message },
+    };
   }
 };
 

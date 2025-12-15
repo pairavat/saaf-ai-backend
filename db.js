@@ -3,10 +3,8 @@ import pkg from "pg";
 const { Pool } = pkg;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, // from .env
-  ssl: {
-    rejectUnauthorized: false, // needed for Neon and other cloud DBs
-  },
+  connectionString: process.env.DATABASE_URL,
+  ssl: true,
 });
 
 export default pool;
