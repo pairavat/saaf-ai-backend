@@ -33,7 +33,7 @@ steps:
         "--allow-unauthenticated",
 
         "--set-env-vars",
-        "GCS_BUCKET_NAME=saaf-ai-images-$PROJECT_ID",
+        "GCS_BUCKET_NAME=saaf-ai-images-$PROJECT_ID,JWT_SECRET=53-0t9wgwpowgjp3-i3itdglkn,REFRESH_SECRET=54-0t9wgwpowgjp4-i4itdglkn,ACCESS_TOKEN_EXPIRES_IN=15m,REFRESH_TOKEN_EXPIRES_IN=30d",
 
         # Very important: secret injected as ENV VAR
         "--update-secrets",
