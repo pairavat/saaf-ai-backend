@@ -18,7 +18,7 @@ loginRoute.post("/login", loginUser);
 // Google Login API - POST /api/auth/google-login
 loginRoute.post("/google-login", googleLogin);
 
-loginRoute.post("/refresh", refreshTokenController);
+loginRoute.post("/auth/refresh", refreshTokenController);
 
 // Protected route
 loginRoute.post("/logout", authenticateToken, logoutUser);

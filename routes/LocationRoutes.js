@@ -5,14 +5,19 @@ import {
   createLocation,
   getZonesWithToilets,
   getNearbyLocations,
-deleteLocationImage,
+  deleteLocationImage,
   getSearchToilet,
-  updateLocationById ,
-  deleteLocationById
+  updateLocationById,
+  deleteLocationById,
+  getSavedToilets,
+  isToiletSaved,
+  saveToilet,
+  unsaveToilet,
 } from "../controller/LocationsController.js";
-import { upload, processAndUploadImages } from "../middlewares/imageUpload.js"
+import { upload, processAndUploadImages } from "../middlewares/imageUpload.js";
+import { verifyToken } from "../utils/jwt.js";
 
-console.log('in get location rutes');
+console.log("in get location rutes");
 const getLocationRoutes = express.Router();
 
 // getLocationRoutes.get("/getUsers", getUser);
@@ -20,30 +25,41 @@ const getLocationRoutes = express.Router();
 getLocationRoutes.get("/", getAllToilets);
 // getLocationRoutes.post("/", createLocation);
 
-getLocationRoutes.get("/zones", getZonesWithToilets);
-getLocationRoutes.get('/nearby', getNearbyLocations);
-getLocationRoutes.get("/:id", getToiletById);
+// ✅ STATIC ROUTES FIRST
 getLocationRoutes.get("/search", getSearchToilet);
-getLocationRoutes.delete("/:id/image", deleteLocationImage);
-// Add this route to your locations routes
-getLocationRoutes.delete('/:id', deleteLocationById);
+getLocationRoutes.get("/zones", getZonesWithToilets);
+getLocationRoutes.get("/nearby", getNearbyLocations);
+getLocationRoutes.get("/saved", verifyToken, getSavedToilets);
 
+// Saved status
+getLocationRoutes.get("/:id/saved", verifyToken, isToiletSaved);
+getLocationRoutes.post("/:id/save", verifyToken, saveToilet);
+getLocationRoutes.delete("/:id/save", verifyToken, unsaveToilet);
+
+// Image delete
+getLocationRoutes.delete("/:id/image", deleteLocationImage);
+
+// ✅ DYNAMIC ROUTES LAST
+getLocationRoutes.get("/:id", getToiletById);
+getLocationRoutes.delete("/:id", deleteLocationById);
 
 // getLocationRoutes.post("/update/:id", updateLocationById);
 
 // ✅ Routes with image upload support
-getLocationRoutes.post("/",
-  upload.fields([{ name: 'images', maxCount: 10 }]), // Support up to 10 images
+getLocationRoutes.post(
+  "/",
+  upload.fields([{ name: "images", maxCount: 10 }]), // Support up to 10 images
   processAndUploadImages([
-    { fieldName: 'images', folder: 'locations', maxCount: 10 }
+    { fieldName: "images", folder: "locations", maxCount: 10 },
   ]),
   createLocation
 );
 
-getLocationRoutes.post("/update/:id",
-  upload.fields([{ name: 'images', maxCount: 10 }]),
+getLocationRoutes.post(
+  "/update/:id",
+  upload.fields([{ name: "images", maxCount: 10 }]),
   processAndUploadImages([
-    { fieldName: 'images', folder: 'locations', maxCount: 10 }
+    { fieldName: "images", folder: "locations", maxCount: 10 },
   ]),
   updateLocationById
 );

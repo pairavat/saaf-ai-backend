@@ -49,30 +49,30 @@ function msToMs(str) {
 // VERIFY ACCESS TOKEN (Middleware)
 // ------------------------------------------------------------
 export const verifyToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
+  const authHeader = req.headers.authorization;
 
-  if (!authHeader) {
+  if (!authHeader)
     return res.status(401).json({ message: "No token provided" });
-  }
 
-  const parts = authHeader.split(" ");
-
-  if (parts.length !== 2 || parts[0] !== "Bearer") {
+  const [type, token] = authHeader.split(" ");
+  if (type !== "Bearer" || !token)
     return res.status(401).json({ message: "Malformed token" });
-  }
-
-  const token = parts[1];
 
   try {
     const decoded = jwt.verify(token, ACCESS_SECRET);
     req.user = decoded;
     next();
   } catch (err) {
-    console.error("Token verification failed:", err);
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({
+        message: "Access token expired",
+        code: "ACCESS_TOKEN_EXPIRED",
+      });
+    }
 
     return res.status(403).json({
-      message: "Invalid or expired token",
-      code: "TOKEN_EXPIRED",
+      message: "Invalid token",
+      code: "INVALID_TOKEN",
     });
   }
 };

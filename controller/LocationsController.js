@@ -60,93 +60,6 @@ export const getAllToilets = async (req, res) => {
   }
 };
 
-// export const getToiletById = async (req, res) => {
-//   console.log('get single toilet')
-//   try {
-//     let locId = req.params.id;
-//     const companyId = req.query.companyId;
-
-//     console.log(req.params, companyId, "ids");
-//     // Build where clause for security
-//     const whereClause = { id: Number(locId) };
-
-//     // Add company_id filter if provided for additional security
-//     if (companyId) {
-//       whereClause.company_id = Number(companyId);
-//     }
-
-//     const location = await prisma.locations.findUnique({
-//       where: whereClause,
-//       include: {
-//         hygiene_scores: {
-//           orderBy: { inspected_at: "desc" },
-//           take: 1,
-//           select: { score: true },
-//         },
-//       },
-//     });
-
-//     if (!location) {
-//       return res.status(404).json({ message: "Toilet not found" });
-//     }
-
-//     const reviews = await prisma.user_review.findMany({
-//       where: { toilet_id: Number(locId) },
-//     });
-
-//     const intReviews = reviews.map((item) => ({
-//       ...item,
-//       toilet_id: typeof item.toilet_id === 'string' ? item?.toilet_id : item?.toilet_id.toString(),
-//       id: typeof item.id === 'string' ? item.id : item.id?.toString(),
-//       user_id: typeof item.user_id === 'string' ? item.user_id : item.user_id?.toString(),
-//     }));
-
-//     console.log(intReviews, "int review")
-//     const userRatings = reviews.map((r) => r.rating).filter(Boolean);
-//     const hygieneScore = location.hygiene_scores[0]?.score ?? null;
-
-//     const hygieneRatingMapped =
-//       hygieneScore !== null
-//         ? hygieneScore >= 100
-//           ? 5
-//           : hygieneScore >= 80
-//             ? 4
-//             : hygieneScore >= 60
-//               ? 3
-//               : hygieneScore >= 40
-//                 ? 2
-//                 : 1
-//         : null;
-
-//     const allRatings = [
-//       ...userRatings,
-//       ...(hygieneRatingMapped !== null ? [hygieneRatingMapped] : []),
-//     ];
-//     const ratingCount = allRatings.length;
-//     const averageRating =
-//       ratingCount > 0
-//         ? allRatings.reduce((sum, r) => sum + r, 0) / ratingCount
-//         : null;
-
-//     const result = {
-//       ...location,
-//       id: location.id.toString(),
-//       parent_id: location.parent_id?.toString() || null,
-//       company_id: location.company_id?.toString() || null,
-//       type_id: location.type_id?.toString() || null,
-//       images: location.images || [], // ✅ Include images array
-//       averageRating,
-//       ratingCount,
-//       ReviewData: intReviews,
-//     };
-
-//     res.json(result);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).send("Error fetching toilet by ID");
-//   }
-// };
-
 export const getToiletById = async (req, res) => {
   console.log("get single toilet");
   try {
@@ -325,7 +238,7 @@ export const getToiletById = async (req, res) => {
       })),
     };
 
-    res.json(result);
+    res.json(sanitizeBigInt(result));
   } catch (err) {
     console.error("Error in getToiletById:", err);
     res.status(500).json({
@@ -396,23 +309,9 @@ export const getSearchToilet = async (req, res) => {
 };
 
 export const createLocation = async (req, res) => {
-  console.log(
-    "in create location -----------------------------////------------"
-  );
-
   try {
     const { name, parent_id, type_id, latitude, longitude, options } = req.body;
     const { companyId } = req.query;
-
-    // ✅ Enhanced debug logging
-    console.log("=== CREATE LOCATION DEBUG ===");
-    console.log("Company ID:", companyId);
-    console.log("Raw body data:", req.body);
-    console.log("Name:", name);
-    console.log("Type ID:", type_id);
-    console.log("Coordinates:", { latitude, longitude });
-    console.log("Options raw:", options);
-    console.log("Options type:", typeof options);
 
     if (typeof options === "string") {
       console.log("Options string value:", options);
@@ -1054,6 +953,111 @@ export const getZonesWithToilets = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error fetching zones and toilets" });
+  }
+};
+
+export const saveToilet = async (req, res) => {
+  try {
+    const { id } = req.params; // location_id
+    const user_id = req.user.id; // Assuming user_id comes from auth middleware
+
+    const saved = await prisma.saved_locations.upsert({
+      where: {
+        user_id_location_id: {
+          user_id: BigInt(user_id),
+          location_id: BigInt(id),
+        },
+      },
+      update: {}, // If exists, do nothing
+      create: {
+        user_id: BigInt(user_id),
+        location_id: BigInt(id),
+      },
+    });
+
+    res.status(201).json({ message: "Toilet saved successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error saving toilet" });
+  }
+};
+
+// 2. Unsave a toilet (DELETE)
+export const unsaveToilet = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user_id = req.user.id;
+
+    await prisma.saved_locations.deleteMany({
+      where: {
+        user_id: BigInt(user_id),
+        location_id: BigInt(id),
+      },
+    });
+
+    res.json({ message: "Toilet removed from saved" });
+  } catch (err) {
+    res.status(500).json({ error: "Error removing toilet" });
+  }
+};
+
+// 3. Get all saved toilets for a user (GET)
+export const getSavedToilets = async (req, res) => {
+  try {
+    const user_id = req.user.id; // From verifyToken middleware
+
+    const savedRecords = await prisma.saved_locations.findMany({
+      where: {
+        user_id: BigInt(user_id),
+      },
+      include: {
+        location: {
+          include: {
+            location_types: true,
+          },
+        },
+      },
+      orderBy: {
+        created_at: "desc",
+      },
+    });
+
+    // Extract the location object and sanitize BigInts
+    const results = savedRecords.map((record) => ({
+      ...record.location,
+      id: record.location.id.toString(),
+      company_id: record.location.company_id?.toString(),
+      type_id: record.location.type_id?.toString(),
+      // Ensure images is always an array for the frontend
+      images: record.location.images || [],
+    }));
+
+    res.json(sanitizeBigInt(results));
+  } catch (err) {
+    console.error("Error in getSavedToilets:", err);
+    res.status(500).json({
+      success: false,
+      error: "Error fetching saved toilets",
+    });
+  }
+};
+
+// 4. Check if a specific toilet is saved (GET)
+export const isToiletSaved = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user_id = req.user.id;
+
+    const count = await prisma.saved_locations.count({
+      where: {
+        user_id: BigInt(user_id),
+        location_id: BigInt(id),
+      },
+    });
+
+    res.json({ isSaved: count > 0 });
+  } catch (err) {
+    res.status(500).json({ error: "Error checking status" });
   }
 };
 

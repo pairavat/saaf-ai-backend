@@ -1,106 +1,9 @@
-// import express from "express";
-// import multer from "multer";
-
-// import path from "path";
-// import fs from "fs";
-// import { fileURLToPath } from "url";
-// import prisma from "../config/prismaClient.mjs";
-// const reviewRoutes = express.Router();
-
-// function normalizeBigInt(obj) {
-//   return JSON.parse(
-//     JSON.stringify(obj, (_, value) =>
-//       typeof value === "bigint" ? Number(value) : value
-//     )
-//   );
-// }
-
-// // Handle __dirname in ES Modules
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname = path.dirname(__filename);
-
-// // Local uploads folder setup
-// const uploadDir = path.join(__dirname, "..", "uploads");
-// if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => cb(null, "uploads/"),
-//   filename: (req, file, cb) => {
-//     const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-//     cb(null, unique + "-" + file.originalname);
-//   },
-// });
-
-// const upload = multer({ storage });
-
-// // ----------- POST /api/user_review ------------
-// reviewRoutes.post("/user-review", upload.array("images"), async (req, res) => {
-//   console.log("post request made for user_review");
-//   try {
-//     const body = req.body;
-//     console.log("Received body:", body);
-//     console.log("files", req.files);
-
-//     // Parse reason_ids safely
-//     const reasonIds = JSON.parse(body.reason_ids || "[]");
-//     const imageFilenames = req.files.map((file) => file.filename);
-
-//     const lat = parseFloat(body.latitude);
-//     const long = parseFloat(body.longitude);
-//     const address = body.address;
-
-//     // ✅ Step 2: Create the review with toilet_id
-//     const review = await prisma.user_review.create({
-//       data: {
-//         name: body.name,
-//         email: body.email,
-//         phone: body.phone,
-//         rating: parseFloat(body.rating),
-//         reason_ids: reasonIds,
-//         latitude: parseFloat(lat),
-//         longitude: parseFloat(long),
-//         description: body.description || "",
-//         toilet_id: body.toilet_id,
-//         // images: req.files?.map((file) => `/uploads/${file.filename}`) || [],
-//         images: imageFilenames,
-//       },
-//     });
-
-//     console.log("Review created:", review);
-//     res.status(201).json({ success: true, data: normalizeBigInt(review) });
-//   } catch (error) {
-//     console.error("Review creation failed:", error);
-//     res.status(400).json({ success: false, error: error.message });
-//   }
-// });
-
-// // ----------- GET /api/user_review --------------//
-// reviewRoutes.get("/", async (req, res) => {
-//   try {
-//     const user_review = await prisma.user_review.findMany({
-//       orderBy: { created_at: "desc" },
-//     });
-
-//     res.json({ success: true, data: normalizeBigInt(user_review) }); // ✅ FIX HERE
-//   } catch (error) {
-//     console.error(error);
-//     res
-//       .status(500)
-//       .json({ success: false, error: "Failed to fetch user_review" });
-//   }
-// });
-
-// export default reviewRoutes;
-
-
-
-
-
 // routes/reviewRoutes.js
 import express from "express";
 import prisma from "../config/prismaClient.mjs";
 // import { upload, processAndUploadImages } from "../middleware/imageUpload.js";
-import { upload , processAndUploadImages } from "../middlewares/imageUpload.js";
+import { upload, processAndUploadImages } from "../middlewares/imageUpload.js";
+import { verifyToken } from "../utils/jwt.js";
 
 const reviewRoutes = express.Router();
 
@@ -114,86 +17,144 @@ function normalizeBigInt(obj) {
 
 // ----------- POST /api/reviews/user-review ------------
 reviewRoutes.post(
-  "/user-review", 
-  upload.fields([{ name: 'images', maxCount: 5 }]), // Configure multer for multiple images
+  "/user-review",
+  upload.fields([{ name: "images", maxCount: 5 }]),
   processAndUploadImages([
-    { fieldName: 'images', folder: 'user-reviews', maxCount: 5 }
+    { fieldName: "images", folder: "user-reviews", maxCount: 5 },
   ]),
   async (req, res) => {
-    console.log("POST request made for user_review");
-    
     try {
-      const body = req.body;
-      console.log("Received body:", body);
-      console.log("Uploaded files:", req.uploadedFiles);
+      const {
+        toilet_id,
+        score,
+        description,
+        anonymous,
+        latitude,
+        longitude,
+        reason_ids = "[]",
+        user_id,
+      } = req.body;
 
-      // Parse reason_ids safely
-      const reasonIds = JSON.parse(body.reason_ids || "[]");
-      
-      // Get Cloudinary URLs from middleware
+      /* ---------------- VALIDATION ---------------- */
+      if (!toilet_id)
+        return res.status(400).json({ message: "toilet_id is required" });
+
+      const rating = Number(score);
+      if (isNaN(rating) || rating < 1 || rating > 10)
+        return res.status(400).json({ message: "Invalid rating" });
+
+      let parsedReasons = [];
+      try {
+        parsedReasons = JSON.parse(reason_ids);
+      } catch {
+        parsedReasons = [];
+      }
+
       const imageUrls = req.uploadedFiles?.images || [];
 
-      const lat = parseFloat(body.latitude);
-      const long = parseFloat(body.longitude);
-
-      // Create the review with Cloudinary image URLs
+      /* ---------------- CREATE ---------------- */
       const review = await prisma.user_review.create({
         data: {
-          name: body.name,
-          email: body.email,
-          phone: body.phone,
-          rating: parseFloat(body.rating),
-          reason_ids: reasonIds,
-          latitude: lat,
-          longitude: long,
-          description: body.description || "",
-          toilet_id: body.toilet_id ? BigInt(body.toilet_id) : null,
-          images: imageUrls, // Store Cloudinary URLs
+          toilet_id: BigInt(toilet_id),
+          location_id: BigInt(toilet_id),
+          user_id: user_id ? BigInt(user_id) : null,
+          anonymous: anonymous === "1" || anonymous === true,
+
+          rating,
+          description: description || "",
+          reason_ids: parsedReasons,
+          images: imageUrls,
+
+          latitude: latitude ? Number(latitude) : null,
+          longitude: longitude ? Number(longitude) : null,
         },
       });
-
-      console.log("Review created:", review);
-      res.status(201).json({ 
-        success: true, 
+      await updateToiletReviewStats(BigInt(toilet_id));
+      return res.status(201).json({
+        success: true,
         data: normalizeBigInt(review),
-        message: "Review submitted successfully!"
+        message: "Review submitted successfully",
       });
-      
     } catch (error) {
       console.error("Review creation failed:", error);
-      res.status(400).json({ 
-        success: false, 
-        error: error.message,
-        message: "Failed to submit review"
+      return res.status(500).json({
+        success: false,
+        message: "Failed to submit review",
       });
     }
   }
 );
 
+// ----------- GET /api/reviews/user/:id --------------
+reviewRoutes.get("/user-reviews", verifyToken, async (req, res) => {
+  try {
+    const user_id = req.user.id;
+
+    const review = await prisma.user_review.findMany({
+      where: { user_id: BigInt(user_id) },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatar_url: true,
+          },
+        },
+        location: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
+      },
+    });
+
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        error: "Review not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: normalizeBigInt(review),
+    });
+  } catch (error) {
+    console.error("Error fetching review:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch review",
+    });
+  }
+});
+
 // ----------- GET /api/reviews/ --------------
 reviewRoutes.get("/", async (req, res) => {
   try {
     const { toilet_id, limit = 50 } = req.query;
-    
+
     const whereClause = toilet_id ? { toilet_id: BigInt(toilet_id) } : {};
-    
+
     const user_reviews = await prisma.user_review.findMany({
       where: whereClause,
       orderBy: { created_at: "desc" },
       take: parseInt(limit),
     });
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       data: normalizeBigInt(user_reviews),
-      count: user_reviews.length
+      count: user_reviews.length,
     });
-    
   } catch (error) {
     console.error("Error fetching reviews:", error);
-    res.status(500).json({ 
-      success: false, 
-      error: "Failed to fetch user reviews" 
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch user reviews",
     });
   }
 });
@@ -202,7 +163,7 @@ reviewRoutes.get("/", async (req, res) => {
 reviewRoutes.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const review = await prisma.user_review.findUnique({
       where: { id: BigInt(id) },
     });
@@ -210,22 +171,166 @@ reviewRoutes.get("/:id", async (req, res) => {
     if (!review) {
       return res.status(404).json({
         success: false,
-        error: "Review not found"
+        error: "Review not found",
       });
     }
 
-    res.json({ 
-      success: true, 
-      data: normalizeBigInt(review)
+    res.json({
+      success: true,
+      data: normalizeBigInt(review),
     });
-    
   } catch (error) {
     console.error("Error fetching review:", error);
-    res.status(500).json({ 
-      success: false, 
-      error: "Failed to fetch review" 
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch review",
     });
   }
 });
+
+reviewRoutes.get("/toilets/:id", async (req, res) => {
+  try {
+    const toiletId = BigInt(req.params.id);
+
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const skip = (page - 1) * limit;
+
+    const sort = req.query.sort || "recent";
+    // recent | highest | photos
+
+    const orderBy =
+      sort === "highest" ? { rating: "desc" } : { created_at: "desc" };
+
+    const where = {
+      toilet_id: toiletId,
+    };
+
+    if (sort === "photos") {
+      where.images = { isEmpty: false };
+    }
+
+    const [reviews, total] = await Promise.all([
+      prisma.user_review.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              avatar_url: true,
+            },
+          },
+        },
+      }),
+
+      prisma.user_review.count({ where }),
+    ]);
+
+    const formatted = reviews.map((r) => ({
+      ...normalizeBigInt(r),
+      user: r.anonymous ? null : r.user,
+    }));
+
+    res.json({
+      success: true,
+      data: serializeBigInt(formatted),
+      meta: {
+        page,
+        limit,
+        total,
+        hasMore: skip + reviews.length < total,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
+  }
+});
+
+reviewRoutes.put(
+  "/user-review/:id",
+  upload.fields([{ name: "images", maxCount: 5 }]),
+  processAndUploadImages([
+    { fieldName: "images", folder: "user-reviews", maxCount: 5 },
+  ]),
+  async (req, res) => {
+    try {
+      const reviewId = BigInt(req.params.id);
+      const userId = req.user?.id;
+
+      const existing = await prisma.user_review.findUnique({
+        where: { id: reviewId },
+      });
+
+      if (!existing || existing.user_id?.toString() !== String(userId))
+        return res.status(403).json({ message: "Unauthorized" });
+
+      const images = req.uploadedFiles?.images || existing.images;
+
+      const updated = await prisma.user_review.update({
+        where: { id: reviewId },
+        data: {
+          rating: Number(req.body.score),
+          description: req.body.description || "",
+          images,
+          anonymous: req.body.anonymous === "1",
+        },
+      });
+
+      res.json({ success: true, data: normalizeBigInt(updated) });
+    } catch (err) {
+      res.status(500).json({ success: false });
+    }
+  }
+);
+
+reviewRoutes.delete("/user-review/:id", verifyToken, async (req, res) => {
+  try {
+    const reviewId = BigInt(req.params.id);
+    const userId = req.user?.id;
+    console.log(userId);
+
+    const review = await prisma.user_review.findUnique({
+      where: { id: reviewId },
+    });
+
+    if (!review || review.user_id?.toString() !== String(userId))
+      return res.status(403).json({ message: "Unauthorized" });
+
+    await prisma.user_review.delete({ where: { id: reviewId } });
+    await updateToiletReviewStats(BigInt(toilet_id));
+    res.json({ success: true, message: "Review deleted" });
+  } catch (err) {
+    res.status(500).json({ success: false });
+  }
+});
+
+async function updateToiletReviewStats(toiletId) {
+  const agg = await prisma.user_review.aggregate({
+    where: { toilet_id: toiletId },
+    _count: { id: true },
+    _avg: { rating: true },
+  });
+
+  await prisma.locations.update({
+    where: { id: toiletId },
+    data: {
+      user_review_score: agg._avg.rating
+        ? Number(agg._avg.rating.toFixed(1))
+        : null,
+    },
+  });
+}
+
+const serializeBigInt = (obj) =>
+  JSON.parse(
+    JSON.stringify(obj, (_, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    )
+  );
 
 export default reviewRoutes;

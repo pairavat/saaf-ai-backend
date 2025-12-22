@@ -36,6 +36,7 @@ model companies {
   locations          locations[]
   registered_users   registered_users[]
   shifts             shifts[]
+  user_reviews       user_review[]        @relation("CompanyUserReviews")
   users              users[]
 }
 
@@ -85,8 +86,8 @@ model locations {
   facility_companiesId   BigInt?
   no_of_photos           Int?
   usage_category         Json?                 @db.Json
-  open_time              DateTime?             @db.Time
-  close_time             DateTime?             @db.Time
+  close_time             DateTime?             @db.Time(6)
+  open_time              DateTime?             @db.Time(6)
   cleaner_assignments    cleaner_assignments[]
   cleaner_reviews        cleaner_review[]      @relation("LocationReviews")
   hygiene_scores         hygiene_scores[]
@@ -95,6 +96,8 @@ model locations {
   locations              locations?            @relation("locationsTolocations", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_locations        locations[]           @relation("locationsTolocations")
   location_types         location_types?       @relation(fields: [type_id], references: [id], onUpdate: NoAction)
+  user_reviews           user_review[]         @relation("LocationUserReviews")
+  saved_by_users         saved_locations[]
 }
 
 model location_types {
@@ -168,8 +171,10 @@ model users {
   refresh_tokens                    refresh_tokens[]
   sessions                          sessions[]
   shift_assignments                 shift_assignments[]
+  user_reviews                      user_review[]         @relation("UserReviews")
   companies                         companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   role                              Role?                 @relation(fields: [role_id], references: [id])
+  saved_locations                   saved_locations[]
 }
 
 model configurations {
@@ -210,7 +215,7 @@ model cleaner_review {
   location         locations?      @relation("LocationReviews", fields: [location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
-model user_review {
+model user_review_qr {
   id          BigInt    @id @default(autoincrement())
   toilet_id   BigInt?
   name        String?   @db.VarChar(100)
@@ -226,6 +231,28 @@ model user_review {
   latitude    Float?
   ai_score    Float?
   company_id  BigInt?
+}
+
+model user_review {
+  id          BigInt     @id @default(autoincrement())
+  toilet_id   BigInt?
+  rating      Float
+  description String?
+  reason_ids  Int[]
+  images      String[]
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+  longitude   Float?
+  latitude    Float?
+  ai_score    Float?
+  company_id  BigInt?
+  anonymous   Boolean    @default(false)
+  /// ---------------- CORE ----------------
+  location_id BigInt?
+  user_id     BigInt?
+  company     companies? @relation("CompanyUserReviews", fields: [company_id], references: [id])
+  location    locations? @relation("LocationUserReviews", fields: [location_id], references: [id], onDelete: Cascade)
+  user        users?     @relation("UserReviews", fields: [user_id], references: [id])
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -361,4 +388,16 @@ model refresh_tokens {
   expires_at DateTime
   created_at DateTime @default(now())
   users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model saved_locations {
+  id          BigInt    @id @default(autoincrement())
+  user_id     BigInt
+  location_id BigInt
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+
+  user     users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  location locations @relation(fields: [location_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, location_id]) // Prevents duplicate saves
 }
