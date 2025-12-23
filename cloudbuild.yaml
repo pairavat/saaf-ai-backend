@@ -33,7 +33,16 @@ steps:
         "--allow-unauthenticated",
 
         "--set-env-vars",
-        "GCS_BUCKET_NAME=saaf-ai-images-$PROJECT_ID,JWT_SECRET=53-0t9wgwpowgjp3-i3itdglkn,REFRESH_SECRET=54-0t9wgwpowgjp4-i4itdglkn,ACCESS_TOKEN_EXPIRES_IN=15m,REFRESH_TOKEN_EXPIRES_IN=30d",
+        "GCS_BUCKET_NAME=saaf-ai-images-$PROJECT_ID,
+        JWT_SECRET=53-0t9wgwpowgjp3-i3itdglkn,
+        REFRESH_SECRET=54-0t9wgwpowgjp4-i4itdglkn,
+        ACCESS_TOKEN_EXPIRES_IN=15m,
+        REFRESH_TOKEN_EXPIRES_IN=30d,
+        EMAIL_HOST=smtp.gmail.com,
+        EMAIL_PORT=587
+        EMAIL_USER=lms.pugarch@gmail.com,
+        EMAIL_PASS=ylrmmltjzzbwkkqx,
+        FRONTEND_URL=https://portal.saafai.in",
 
         # Very important: secret injected as ENV VAR
         "--update-secrets",

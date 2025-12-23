@@ -5,6 +5,8 @@ import {
   googleLogin,
   refreshTokenController,
   logoutUser,
+  forgotPassword,
+  resetPassword,
 } from "../controller/authController.js";
 import { authenticateToken } from "../middlewares/authMiddleware.js";
 const loginRoute = express.Router();
@@ -22,5 +24,9 @@ loginRoute.post("/auth/refresh", refreshTokenController);
 
 // Protected route
 loginRoute.post("/logout", authenticateToken, logoutUser);
+
+loginRoute.post("/forgot-password", forgotPassword);
+
+loginRoute.post("/reset-password", resetPassword);
 
 export default loginRoute;

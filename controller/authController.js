@@ -1,5 +1,7 @@
 import prisma from "../config/prismaClient.mjs";
 import bcrypt from "bcryptjs";
+import nodemailer from "nodemailer";
+import jwt from "jsonwebtoken";
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -8,6 +10,17 @@ import {
 import { OAuth2Client } from "google-auth-library";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_WEB_CLIENT_ID);
+
+// Configure Nodemailer Transporter
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 /* ------------------------------------------------------------
    NORMAL SIGNUP (Phone / Email + Password)
@@ -357,5 +370,113 @@ export const logoutUser = async (req, res) => {
   } catch (error) {
     console.error("Logout Error:", error);
     return res.status(500).json({ status: "error", message: "Logout failed" });
+  }
+};
+
+/* ------------------------------------------------------------
+   FORGOT PASSWORD - Send Reset Email
+------------------------------------------------------------ */
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "Email is required" });
+    }
+
+    const user = await prisma.users.findUnique({ where: { email } });
+
+    if (!user) {
+      // For security, don't reveal if user exists. Just send success.
+      return res.json({
+        status: "success",
+        message: "If account exists, reset link sent.",
+      });
+    }
+
+    // Generate a temporary reset token (valid for 15 mins)
+    const resetToken = jwt.sign(
+      { userId: user.id.toString() },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+    // Send Email
+    await transporter.sendMail({
+      from: `"SaafAI Support" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: "Password Reset Request",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+          <h2 style="color: #3b82f6;">SaafAI Password Reset</h2>
+          <p>Hi ${user.name || "User"},</p>
+          <p>You requested to reset your password. Click the button below to proceed. This link expires in 15 minutes.</p>
+          <a href="${resetLink}" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">Reset Password</a>
+          <p style="margin-top: 20px; color: #64748b; font-size: 12px;">If you didn't request this, please ignore this email.</p>
+        </div>
+      `,
+    });
+
+    return res.json({
+      status: "success",
+      message: "Reset link sent successfully",
+    });
+  } catch (error) {
+    console.error("Forgot Password Error:", error);
+    return res
+      .status(500)
+      .json({ status: "error", message: "Failed to send email" });
+  }
+};
+
+/* ------------------------------------------------------------
+   RESET PASSWORD - Verify Token and Update Password
+------------------------------------------------------------ */
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        status: "error",
+        message: "Token and new password are required",
+      });
+    }
+
+    // 1. Verify Token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res
+        .status(401)
+        .json({ status: "error", message: "Token expired or invalid" });
+    }
+
+    const userId = BigInt(decoded.userId);
+
+    // 2. Hash New Password
+    const hashed = await bcrypt.hash(newPassword, 10);
+
+    // 3. Update User
+    await prisma.users.update({
+      where: { id: userId },
+      data: {
+        password: hashed,
+        token: null, // Optional: logout from current session
+      },
+    });
+
+    return res.json({
+      status: "success",
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    console.error("Reset Password Error:", error);
+    return res.status(500).json({ status: "error", message: "Reset failed" });
   }
 };
