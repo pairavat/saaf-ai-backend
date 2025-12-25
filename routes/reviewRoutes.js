@@ -193,42 +193,40 @@ reviewRoutes.get("/toilets/:id", async (req, res) => {
     const toiletId = BigInt(req.params.id);
 
     const page = Math.max(parseInt(req.query.page) || 1, 1);
-    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const limit = Math.min(parseInt(req.query.limit) || 10, 30);
     const skip = (page - 1) * limit;
 
-    const sort = req.query.sort || "recent";
-    // recent | highest | photos
+    const sort = req.query.sort || "recent"; // recent | highest | photos
 
-    const orderBy =
-      sort === "highest" ? { rating: "desc" } : { created_at: "desc" };
+    let orderBy = { created_at: "desc" };
+    let where = { toilet_id: toiletId };
 
-    const where = {
-      toilet_id: toiletId,
-    };
+    if (sort === "highest") {
+      orderBy = { rating: "desc" };
+    }
 
     if (sort === "photos") {
       where.images = { isEmpty: false };
     }
 
-    const [reviews, total] = await Promise.all([
-      prisma.user_review.findMany({
-        where,
-        orderBy,
-        skip,
-        take: limit,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              avatar_url: true,
-            },
+    const reviews = await prisma.user_review.findMany({
+      where,
+      orderBy,
+      skip,
+      take: limit + 1, // 🔥 fetch 1 extra to detect hasMore
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatar_url: true,
           },
         },
-      }),
+      },
+    });
 
-      prisma.user_review.count({ where }),
-    ]);
+    const hasMore = reviews.length > limit;
+    if (hasMore) reviews.pop();
 
     const formatted = reviews.map((r) => ({
       ...normalizeBigInt(r),
@@ -237,12 +235,11 @@ reviewRoutes.get("/toilets/:id", async (req, res) => {
 
     res.json({
       success: true,
-      data: serializeBigInt(formatted),
+      data: formatted,
       meta: {
         page,
         limit,
-        total,
-        hasMore: skip + reviews.length < total,
+        hasMore,
       },
     });
   } catch (err) {

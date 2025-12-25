@@ -2,13 +2,13 @@ import express, { Router } from "express";
 import {
   getAllToilets,
   getToiletById,
-  createLocation,
+  // createLocation,
   getZonesWithToilets,
   getNearbyLocations,
-  deleteLocationImage,
+  // deleteLocationImage,
   getSearchToilet,
-  updateLocationById,
-  deleteLocationById,
+  // updateLocationById,
+  // deleteLocationById,
   getSavedToilets,
   isToiletSaved,
   saveToilet,
@@ -37,32 +37,32 @@ getLocationRoutes.post("/:id/save", verifyToken, saveToilet);
 getLocationRoutes.delete("/:id/save", verifyToken, unsaveToilet);
 
 // Image delete
-getLocationRoutes.delete("/:id/image", deleteLocationImage);
+// getLocationRoutes.delete("/:id/image", deleteLocationImage);
 
 // ✅ DYNAMIC ROUTES LAST
 getLocationRoutes.get("/:id", getToiletById);
-getLocationRoutes.delete("/:id", deleteLocationById);
+// getLocationRoutes.delete("/:id", deleteLocationById);
 
 // getLocationRoutes.post("/update/:id", updateLocationById);
 
 // ✅ Routes with image upload support
-getLocationRoutes.post(
-  "/",
-  upload.fields([{ name: "images", maxCount: 10 }]), // Support up to 10 images
-  processAndUploadImages([
-    { fieldName: "images", folder: "locations", maxCount: 10 },
-  ]),
-  createLocation
-);
+// getLocationRoutes.post(
+//   "/",
+//   upload.fields([{ name: "images", maxCount: 10 }]), // Support up to 10 images
+//   processAndUploadImages([
+//     { fieldName: "images", folder: "locations", maxCount: 10 },
+//   ]),
+//   createLocation
+// );
 
-getLocationRoutes.post(
-  "/update/:id",
-  upload.fields([{ name: "images", maxCount: 10 }]),
-  processAndUploadImages([
-    { fieldName: "images", folder: "locations", maxCount: 10 },
-  ]),
-  updateLocationById
-);
+// getLocationRoutes.post(
+//   "/update/:id",
+//   upload.fields([{ name: "images", maxCount: 10 }]),
+//   processAndUploadImages([
+//     { fieldName: "images", folder: "locations", maxCount: 10 },
+//   ]),
+//   updateLocationById
+// );
 
 // -------------- old routes ---------------
 

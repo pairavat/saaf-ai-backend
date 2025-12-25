@@ -8,6 +8,7 @@ import {
   updateUser,
   getUserById,
 } from "../controller/userController.js";
+import { verifyToken } from "../utils/jwt.js";
 
 const userRouter = express.Router();
 
@@ -15,7 +16,7 @@ const userRouter = express.Router();
 userRouter.get("/", getAllUsers);
 userRouter.get("/:id", getUserById);
 userRouter.post("/", createUser);
-userRouter.post("/:id", updateUser);
+userRouter.post("/:id", verifyToken, updateUser);
 userRouter.delete("/:id", deleteUser);
 
 export default userRouter;
