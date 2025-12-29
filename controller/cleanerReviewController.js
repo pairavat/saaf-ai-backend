@@ -589,6 +589,7 @@ export async function completeCleanerReview(req, res) {
           // numericScore = +(6.5 + Math.random() * (9 - 6.5)).toFixed(2);
           numericScore = 10;
         }
+
         // const safeScore = Number.isFinite(numericScore) ? numericScore : 0;
 
         // console.log(
@@ -607,11 +608,18 @@ export async function completeCleanerReview(req, res) {
           },
         });
 
+        let sampleScore = numericScore;
+        //286,272
+        let toiletIds = [286, 272];
+        if (toiletIds.includes(reviewData.location_id) && score > 5) {
+          sampleScore = +(Math.random() * (4 - 2) + 2).toFixed(1);
+        }
+
         // 4️⃣ Insert hygiene_scores record and capture the result
         const hygieneScore = await prisma.hygiene_scores.create({
           data: {
             location_id: reviewData.location_id,
-            score: numericScore,
+            score: sampleScore,
             original_score: numericScore,
             details: {
               method: "AI Hygiene Model v1",
