@@ -382,7 +382,7 @@ export const getNearbyLocations = async (req, res) => {
 
         WHERE l.latitude IS NOT NULL
           AND l.longitude IS NOT NULL
-          AND l.deletedAt IS NULL
+          AND l."deletedAt" IS NULL
           AND l.status = true
 
         GROUP BY
