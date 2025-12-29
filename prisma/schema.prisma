@@ -96,8 +96,8 @@ model locations {
   locations              locations?            @relation("locationsTolocations", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_locations        locations[]           @relation("locationsTolocations")
   location_types         location_types?       @relation(fields: [type_id], references: [id], onUpdate: NoAction)
-  user_reviews           user_review[]         @relation("LocationUserReviews")
   saved_by_users         saved_locations[]
+  user_reviews           user_review[]         @relation("LocationUserReviews")
 }
 
 model location_types {
@@ -159,7 +159,7 @@ model users {
   birthdate                         DateTime?             @db.Date
   role_id                           Int?
   deletedAt                         DateTime?
-  token                             String?               @db.VarChar(255)
+  token                             String?
   fcm_token                         String?               @db.VarChar(255)
   avatar_url                        String?
   google_id                         String?               @unique
@@ -169,12 +169,12 @@ model users {
   cleaner_reviews                   cleaner_review[]      @relation("CleanerReviews")
   hygiene_scores                    hygiene_scores[]
   refresh_tokens                    refresh_tokens[]
+  saved_locations                   saved_locations[]
   sessions                          sessions[]
   shift_assignments                 shift_assignments[]
   user_reviews                      user_review[]         @relation("UserReviews")
   companies                         companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   role                              Role?                 @relation(fields: [role_id], references: [id])
-  saved_locations                   saved_locations[]
 }
 
 model configurations {
@@ -293,6 +293,7 @@ model Role {
   is_active           Boolean               @default(true)
   created_at          DateTime?             @default(now())
   updated_at          DateTime?             @updatedAt
+  company_id          BigInt?
   cleaner_assignments cleaner_assignments[]
   registered_users    registered_users[]
   shift_assignments   shift_assignments[]
@@ -395,9 +396,8 @@ model saved_locations {
   user_id     BigInt
   location_id BigInt
   created_at  DateTime? @default(now()) @db.Timestamp(6)
+  location    locations @relation(fields: [location_id], references: [id], onDelete: Cascade)
+  user        users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  user     users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  location locations @relation(fields: [location_id], references: [id], onDelete: Cascade)
-
-  @@unique([user_id, location_id]) // Prevents duplicate saves
+  @@unique([user_id, location_id])
 }
