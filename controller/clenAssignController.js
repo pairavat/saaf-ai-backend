@@ -125,8 +125,18 @@ export const getAssignmentByCleanerUserId = async (req, res) => {
     console.log(cleanerUserId, "cleaner_user_id");
 
     const assignments = await prisma.cleaner_assignments.findMany({
-      where: { cleaner_user_id: cleanerUserId, status: "assigned" },
-      include: { locations: true },
+      where: {
+        cleaner_user_id: cleanerUserId,
+        status: "assigned",
+        deleted_at: null,
+      },
+      include: {
+        locations: {
+          where: {
+            deleted_at: null,
+          },
+        },
+      },
       orderBy: { name: "asc" },
     });
 

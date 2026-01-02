@@ -29,7 +29,7 @@ model companies {
   created_at         DateTime?            @default(now()) @db.Timestamp(6)
   updated_at         DateTime?            @default(now()) @db.Timestamp(6)
   status             Boolean              @default(true)
-  deletedAt          DateTime?
+  deleted_at         DateTime?
   cleaner_review     cleaner_review[]     @relation("CompanyReviews")
   facility_companies facility_companies[]
   location_types     location_types[]
@@ -73,7 +73,7 @@ model locations {
   options                Json?                 @default("{}")
   lang_preference        String?               @db.VarChar(255)
   images                 String[]
-  deletedAt              DateTime?
+  deleted_at             DateTime?
   address                String?
   average_cleaning_score Float?
   city                   String?
@@ -83,7 +83,7 @@ model locations {
   user_review_score      Float?
   pincode                String?
   state                  String?
-  facility_companiesId   BigInt?
+  facility_company_id    BigInt?
   no_of_photos           Int?
   usage_category         Json?                 @db.Json
   close_time             DateTime?             @db.Time(6)
@@ -92,7 +92,7 @@ model locations {
   cleaner_reviews        cleaner_review[]      @relation("LocationReviews")
   hygiene_scores         hygiene_scores[]
   companies              companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  facility_companies     facility_companies?   @relation(fields: [facility_companiesId], references: [id])
+  facility_companies     facility_companies?   @relation(fields: [facility_company_id], references: [id])
   locations              locations?            @relation("locationsTolocations", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_locations        locations[]           @relation("locationsTolocations")
   location_types         location_types?       @relation(fields: [type_id], references: [id], onUpdate: NoAction)
@@ -109,7 +109,7 @@ model location_types {
   created_at           DateTime?        @default(now()) @db.Timestamp(6)
   updated_at           DateTime?        @default(now()) @db.Timestamp(6)
   is_toilet            Boolean?
-  deletedAt            DateTime?
+  deleted_at           DateTime?
   companies            companies?       @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   location_types       location_types?  @relation("location_typesTolocation_types", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_location_types location_types[] @relation("location_typesTolocation_types")
@@ -158,11 +158,13 @@ model users {
   age                               Int?
   birthdate                         DateTime?             @db.Date
   role_id                           Int?
-  deletedAt                         DateTime?
+  deleted_at                        DateTime?
   token                             String?
   fcm_token                         String?               @db.VarChar(255)
   avatar_url                        String?
   google_id                         String?               @unique
+  facility_companiesId              BigInt?
+  facility_company_id               BigInt?
   activity_logs                     activity_logs[]
   cleaner_assignments_as_cleaner    cleaner_assignments[] @relation("CleanerUser")
   cleaner_assignments_as_supervisor cleaner_assignments[] @relation("Supervisor")
@@ -174,6 +176,7 @@ model users {
   shift_assignments                 shift_assignments[]
   user_reviews                      user_review[]         @relation("UserReviews")
   companies                         companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  facility_companies                facility_companies?   @relation(fields: [facility_companiesId], references: [id])
   role                              Role?                 @relation(fields: [role_id], references: [id])
 }
 
@@ -278,7 +281,7 @@ model cleaner_assignments {
   updated_at      DateTime?  @default(now()) @db.Timestamp(6)
   supervisor_id   BigInt?
   role_id         Int?
-  deletedAt       DateTime?
+  deleted_at      DateTime?
   cleaner_user    users      @relation("CleanerUser", fields: [cleaner_user_id], references: [id])
   Role            Role?      @relation(fields: [role_id], references: [id])
   supervisor      users?     @relation("Supervisor", fields: [supervisor_id], references: [id])
@@ -342,26 +345,27 @@ model facility_companies {
   company_id              BigInt
   created_at              DateTime    @default(now()) @db.Timestamp(6)
   updated_at              DateTime    @db.Timestamp(6)
-  deletedAt               DateTime?
+  deleted_at              DateTime?
   companies               companies   @relation(fields: [company_id], references: [id], onDelete: Cascade)
   locations               locations[]
+  users                   users[]
 }
 
 model shift_assignments {
-  id        BigInt    @id @default(autoincrement())
-  shiftId   BigInt
-  user_id   BigInt
-  startDate DateTime
-  endDate   DateTime?
-  status    String    @default("active") @db.VarChar(50)
-  notes     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime
-  deletedAt DateTime?
-  role_id   Int?
-  Role      Role?     @relation(fields: [role_id], references: [id])
-  shifts    shifts    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  users     users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id         BigInt    @id @default(autoincrement())
+  shiftId    BigInt
+  user_id    BigInt
+  startDate  DateTime
+  endDate    DateTime?
+  status     String    @default("active") @db.VarChar(50)
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime
+  role_id    Int?
+  deleted_at DateTime?
+  Role       Role?     @relation(fields: [role_id], references: [id])
+  shifts     shifts    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
 model shifts {
@@ -373,7 +377,7 @@ model shifts {
   effectiveUntil    DateTime?
   createdAt         DateTime?           @default(now()) @db.Timestamp(6)
   updatedAt         DateTime?           @db.Timestamp(6)
-  deletedAt         DateTime?
+  deleted_at        DateTime?
   company_id        BigInt?
   status            Boolean             @default(true)
   startTime         DateTime?           @db.Time(6)
