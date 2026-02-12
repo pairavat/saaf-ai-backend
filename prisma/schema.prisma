@@ -88,6 +88,8 @@ model locations {
   usage_category         Json?                 @db.Json
   close_time             DateTime?             @db.Time(6)
   open_time              DateTime?             @db.Time(6)
+  is_public              Boolean               @default(true)
+  schedule               Json?                 @db.Json
   cleaner_assignments    cleaner_assignments[]
   cleaner_reviews        cleaner_review[]      @relation("LocationReviews")
   hygiene_scores         hygiene_scores[]
@@ -163,7 +165,6 @@ model users {
   fcm_token                         String?               @db.VarChar(255)
   avatar_url                        String?
   google_id                         String?               @unique
-  facility_companiesId              BigInt?
   facility_company_id               BigInt?
   activity_logs                     activity_logs[]
   cleaner_assignments_as_cleaner    cleaner_assignments[] @relation("CleanerUser")
@@ -176,7 +177,7 @@ model users {
   shift_assignments                 shift_assignments[]
   user_reviews                      user_review[]         @relation("UserReviews")
   companies                         companies?            @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  facility_companies                facility_companies?   @relation(fields: [facility_companiesId], references: [id])
+  facility_companies                facility_companies?   @relation(fields: [facility_company_id], references: [id])
   role                              Role?                 @relation(fields: [role_id], references: [id])
 }
 
@@ -404,4 +405,14 @@ model saved_locations {
   user        users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, location_id])
+}
+
+model service_request {
+  id           BigInt   @id @default(autoincrement())
+  latitude     Decimal  @db.Decimal(10, 7)
+  longitude    Decimal  @db.Decimal(10, 7)
+  city         String?
+  state        String?
+  request_type String
+  created_at   DateTime @default(now())
 }

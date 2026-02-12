@@ -21,38 +21,6 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-// ✅ Correct CORS setup (put before routes)
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:8100", // Ionic dev
-  "http://localhost:8101", // Ionic dev
-  "http://localhost:8102", // Ionic dev
-  "capacitor://localhost", // Capacitor native
-  "ionic://localhost", // Ionic native
-  "https://localhost", // Ionic native
-  "http://localhost", // Ionic native
-  "https://safai-index-frontend.onrender.com", // your frontend (change if needed)
-  "https://safai-index.vercel.app",
-  "https://saaf-ai.vercel.app",
-  "https://safaiindex.vercel.app",
-  "*",
-];
-
-// app.use(
-//   cors({
-//     origin: function (origin, callback) {
-//       if (!origin || allowedOrigins.includes(origin)) {
-//         callback(null, true);
-//       } else {
-//         callback(new Error("Not allowed by CORS: " + origin));
-//       }
-//     },
-//     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-//     allowedHeaders: ["Content-Type", "Authorization"],
-//     credentials: true,
-//   })
-// );
-
 app.use(
   cors({
     origin: "*",
