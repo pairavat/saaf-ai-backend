@@ -682,9 +682,9 @@ export async function completeCleanerReview(req, res) {
           tokens = [...new Set(tokens)];
           let msg = "";
           if (numericScore >= 8) {
-            msg = `New task completed by ${cleanerName} at ${locationName} with score ${numericScore}`;
+            msg = `New task completed by ${cleanerName} at ${locationName}`;
           } else {
-            msg = `New task completed by ${cleanerName} at ${locationName} with score ${numericScore}`;
+            msg = `New task completed by ${cleanerName} at ${locationName}`;
           }
 
           // 6️⃣ Send notification
