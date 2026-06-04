@@ -415,6 +415,7 @@ export async function createCleanerReview(req, res) {
       tasks,
       initial_comment,
       company_id,
+      created_at,
     } = req.body;
 
     // Get uploaded URLs from middleware
@@ -465,6 +466,7 @@ export async function createCleanerReview(req, res) {
         after_photo: [],
         status: "ongoing",
         company_id: company_id ? BigInt(company_id) : null,
+        created_at: created_at ? new Date(created_at) : undefined,
       },
     });
 
