@@ -452,23 +452,49 @@ export async function createCleanerReview(req, res) {
     // console.log("Parsed tasks:", parsedTasks);
     // console.log("Tasks count:", parsedTasks.length);
 
-    const review = await prisma.cleaner_review.create({
-      data: {
-        name,
+    let review;
+    const existingReview = await prisma.cleaner_review.findFirst({
+      where: {
         location_id: location_id ? BigInt(location_id) : null,
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        address,
         cleaner_user_id: cleaner_user_id ? BigInt(cleaner_user_id) : null,
-        tasks: parsedTasks,
-        initial_comment: initial_comment || null,
-        before_photo: beforePhotos,
-        after_photo: [],
         status: "ongoing",
-        company_id: company_id ? BigInt(company_id) : null,
-        created_at: created_at ? new Date(created_at) : undefined,
       },
     });
+
+    if (existingReview) {
+      const updatedBeforePhotos = [...existingReview.before_photo, ...beforePhotos];
+      const updatedTasks = [...new Set([...existingReview.tasks, ...parsedTasks])];
+      const updatedComment = existingReview.initial_comment 
+        ? `${existingReview.initial_comment} | ${initial_comment}` 
+        : initial_comment;
+
+      review = await prisma.cleaner_review.update({
+        where: { id: existingReview.id },
+        data: {
+          before_photo: updatedBeforePhotos,
+          tasks: updatedTasks,
+          initial_comment: updatedComment,
+        },
+      });
+    } else {
+      review = await prisma.cleaner_review.create({
+        data: {
+          name,
+          location_id: location_id ? BigInt(location_id) : null,
+          latitude: latitude ? parseFloat(latitude) : null,
+          longitude: longitude ? parseFloat(longitude) : null,
+          address,
+          cleaner_user_id: cleaner_user_id ? BigInt(cleaner_user_id) : null,
+          tasks: parsedTasks,
+          initial_comment: initial_comment || null,
+          before_photo: beforePhotos,
+          after_photo: [],
+          status: "ongoing",
+          company_id: company_id ? BigInt(company_id) : null,
+          created_at: created_at ? new Date(created_at) : undefined,
+        },
+      });
+    }
 
     const serializedData = {
       ...review,
@@ -533,7 +559,9 @@ export async function createCleanerReview(req, res) {
 
 export async function completeCleanerReview(req, res) {
   try {
-    const { final_comment, id, tasks } = req.body;
+    const { final_comment, id, tasks, is_last_section } = req.body;
+    const isLast = is_last_section === "true" || is_last_section === true;
+
     // const afterPhotos = req.uploadedFiles?.after_photo || [];
     const afterPhotos = (req.uploadedFiles?.after_photo || []).filter(
       (url) => !!url
@@ -557,22 +585,56 @@ export async function completeCleanerReview(req, res) {
       }
     }
 
+    // Retrieve existing review
+    const existing = await prisma.cleaner_review.findUnique({
+      where: { id: BigInt(id) },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ status: "error", message: "Review not found" });
+    }
+
+    const updatedAfterPhotos = [...existing.after_photo, ...afterPhotos];
+    const updatedTasks = [...new Set([...existing.tasks, ...parsedTasks])];
+    const updatedComment = existing.final_comment 
+      ? `${existing.final_comment} | ${final_comment}` 
+      : final_comment;
+
+    if (!isLast) {
+      const review = await prisma.cleaner_review.update({
+        where: { id: BigInt(id) },
+        data: {
+          after_photo: updatedAfterPhotos,
+          final_comment: updatedComment || null,
+          status: "ongoing",
+          updated_at: new Date().toISOString(),
+          tasks: updatedTasks,
+        },
+      });
+
+      return res.json({
+        status: "success",
+        message: "Section completed successfully. Washroom remains ongoing.",
+        data: stringifyBigInts(review),
+      });
+    }
+
     // 1️⃣ Update the review immediately as "processing"
     const review = await prisma.cleaner_review.update({
       where: { id: BigInt(id) },
       data: {
-        after_photo: afterPhotos,
-        final_comment: final_comment || null,
+        after_photo: updatedAfterPhotos,
+        final_comment: updatedComment || null,
         status: "processing",
         updated_at: new Date().toISOString(),
-        tasks: parsedTasks,
+        tasks: updatedTasks,
       },
     });
 
     // 2️⃣ Respond immediately to mobile app
     res.json({
       status: "success",
-      message: "Review submitted successfully. Scoring in progress.",
+      message: "Final section completed. Review submitted successfully. Scoring in progress.",
       data: stringifyBigInts(review),
     });
 
@@ -581,7 +643,7 @@ export async function completeCleanerReview(req, res) {
       try {
         // console.log("⚙️ Background: Processing hygiene scoring for review", id);
 
-        const { score, metadata } = await processHygieneScoring(afterPhotos);
+        const { score, metadata } = await processHygieneScoring(updatedAfterPhotos);
 
         // ✅ Force numeric and finite
         let numericScore = Number.parseFloat(score) || 0;
@@ -625,11 +687,11 @@ export async function completeCleanerReview(req, res) {
             original_score: numericScore,
             details: {
               method: "AI Hygiene Model v1",
-              images_analyzed: afterPhotos.length,
+              images_analyzed: updatedAfterPhotos.length,
               ai_response: metadata, // 👈 FULL AI JSON
               computed_at: new Date().toISOString(),
             },
-            image_url: afterPhotos[0] || null,
+            image_url: updatedAfterPhotos[0] || null,
             inspected_at: new Date(),
             created_by: reviewData.cleaner_user_id,
             company_id: reviewData.company_id,
