@@ -416,6 +416,7 @@ export async function createCleanerReview(req, res) {
       initial_comment,
       company_id,
       created_at,
+      multiple_sections,
     } = req.body;
 
     // Get uploaded URLs from middleware
@@ -453,13 +454,18 @@ export async function createCleanerReview(req, res) {
     // console.log("Tasks count:", parsedTasks.length);
 
     let review;
-    const existingReview = await prisma.cleaner_review.findFirst({
-      where: {
-        location_id: location_id ? BigInt(location_id) : null,
-        cleaner_user_id: cleaner_user_id ? BigInt(cleaner_user_id) : null,
-        status: "ongoing",
-      },
-    });
+    const isMultiple = multiple_sections === "true" || multiple_sections === true;
+
+    let existingReview = null;
+    if (isMultiple) {
+      existingReview = await prisma.cleaner_review.findFirst({
+        where: {
+          location_id: location_id ? BigInt(location_id) : null,
+          cleaner_user_id: cleaner_user_id ? BigInt(cleaner_user_id) : null,
+          status: "ongoing",
+        },
+      });
+    }
 
     if (existingReview) {
       const updatedBeforePhotos = [...existingReview.before_photo, ...beforePhotos];
@@ -560,7 +566,8 @@ export async function createCleanerReview(req, res) {
 export async function completeCleanerReview(req, res) {
   try {
     const { final_comment, id, tasks, is_last_section } = req.body;
-    const isLast = is_last_section === "true" || is_last_section === true;
+    // Default to true if not specified (supports the old app version)
+    const isLast = is_last_section === undefined || is_last_section === "true" || is_last_section === true;
 
     // const afterPhotos = req.uploadedFiles?.after_photo || [];
     const afterPhotos = (req.uploadedFiles?.after_photo || []).filter(
