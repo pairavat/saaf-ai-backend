@@ -162,12 +162,11 @@ export const getCleanerReviewsById = async (req, res) => {
         lte: endOfDay,
       };
     } else {
-      // Default view: return all ongoing reviews, plus any reviews from the last 24 hours
+      // Default view: return any reviews (ongoing or completed) from the last 24 hours
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      whereClause.OR = [
-        { status: "ongoing" },
-        { created_at: { gte: twentyFourHoursAgo } },
-      ];
+      whereClause.created_at = {
+        gte: twentyFourHoursAgo,
+      };
     }
 
     // ✅ Fetch reviews for the given cleaner and date
