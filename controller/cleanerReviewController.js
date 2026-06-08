@@ -126,7 +126,8 @@ export async function getCleanerReview(req, res) {
 }
 
 export const getCleanerReviewsById = async (req, res) => {
-  const { cleaner_user_id, date } = req.params;
+  const { cleaner_user_id } = req.params;
+  const date = req.params.date || req.query.date;
 
   let stats = {};
   try {
@@ -139,32 +140,39 @@ export const getCleanerReviewsById = async (req, res) => {
       });
     }
 
-    // ✅ Determine which date to use — provided or today
-    const targetDate = date ? new Date(date) : new Date();
+    const whereClause = {
+      cleaner_user_id: cleanUserId,
+    };
 
-    if (isNaN(targetDate)) {
-      return res.status(400).json({
-        status: "error",
-        message: "Invalid date format. Use YYYY-MM-DD",
-      });
+    if (date) {
+      const targetDate = new Date(date);
+      if (isNaN(targetDate)) {
+        return res.status(400).json({
+          status: "error",
+          message: "Invalid date format. Use YYYY-MM-DD",
+        });
+      }
+      const startOfDay = new Date(targetDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      whereClause.created_at = {
+        gte: startOfDay,
+        lte: endOfDay,
+      };
+    } else {
+      // Default view: return all ongoing reviews, plus any reviews from the last 24 hours
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      whereClause.OR = [
+        { status: "ongoing" },
+        { created_at: { gte: twentyFourHoursAgo } },
+      ];
     }
-
-    // ✅ Calculate start and end of the day (00:00:00 to 23:59:59)
-    const startOfDay = new Date(targetDate);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(targetDate);
-    endOfDay.setHours(23, 59, 59, 999);
 
     // ✅ Fetch reviews for the given cleaner and date
     const reviews = await prisma.cleaner_review.findMany({
-      where: {
-        cleaner_user_id: cleanUserId,
-        created_at: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
-      },
+      where: whereClause,
       include: {
         cleaner_user: {
           select: {
