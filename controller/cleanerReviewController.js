@@ -4,6 +4,18 @@ import FormData from "form-data";
 import fs from "fs";
 import path from "path";
 import { sendNotificationToMany } from "./notificationController.js";
+
+const safeBigInt = (val) => {
+  if (val === null || val === undefined) return null;
+  const str = String(val).trim();
+  if (str === "" || str === "null" || str === "undefined") return null;
+  try {
+    return BigInt(str);
+  } catch (e) {
+    return null;
+  }
+};
+
 // =========================================================
 // 1️⃣ GET all cleaner reviews (with filters)
 // =========================================================
@@ -20,11 +32,13 @@ export async function getCleanerReview(req, res) {
   try {
     const whereClause = {};
 
-    if (cleaner_user_id) {
-      whereClause.cleaner_user_id = BigInt(cleaner_user_id);
+    const cleanUserId = safeBigInt(cleaner_user_id);
+    if (cleanUserId !== null) {
+      whereClause.cleaner_user_id = cleanUserId;
     }
-    if (company_id) {
-      whereClause.company_id = company_id;
+    const compId = safeBigInt(company_id);
+    if (compId !== null) {
+      whereClause.company_id = compId;
     }
 
     if (status) {
@@ -117,7 +131,8 @@ export const getCleanerReviewsById = async (req, res) => {
   let stats = {};
   try {
     // ✅ Input validation
-    if (!cleaner_user_id || isNaN(cleaner_user_id)) {
+    const cleanUserId = safeBigInt(cleaner_user_id);
+    if (cleanUserId === null) {
       return res.status(400).json({
         status: "error",
         message: "Invalid cleaner user ID provided",
@@ -144,7 +159,7 @@ export const getCleanerReviewsById = async (req, res) => {
     // ✅ Fetch reviews for the given cleaner and date
     const reviews = await prisma.cleaner_review.findMany({
       where: {
-        cleaner_user_id: BigInt(cleaner_user_id),
+        cleaner_user_id: cleanUserId,
         created_at: {
           gte: startOfDay,
           lte: endOfDay,
@@ -248,17 +263,18 @@ export const getCleanerReviewsByTaskId = async (req, res) => {
   let stats = {};
   try {
     // Input validation
-    if (!task_id || isNaN(task_id)) {
+    const cleanTaskId = safeBigInt(task_id);
+    if (cleanTaskId === null) {
       return res.status(400).json({
         status: "error",
-        message: "Invalid cleaner user ID provided",
+        message: "Invalid task ID provided",
       });
     }
 
     // ✅ Single query with all related data using include
     const reviews = await prisma.cleaner_review.findMany({
       where: {
-        id: BigInt(task_id),
+        id: cleanTaskId,
       },
       include: {
         // ✅ Include user details automatically
@@ -458,11 +474,19 @@ export async function createCleanerReview(req, res) {
 
     let existingReview = null;
     if (isMultiple) {
+      const targetDate = created_at ? new Date(created_at) : new Date();
+      const twelveHoursAgo = new Date(targetDate.getTime() - 12 * 60 * 60 * 1000);
+      const twelveHoursAhead = new Date(targetDate.getTime() + 12 * 60 * 60 * 1000);
+
       existingReview = await prisma.cleaner_review.findFirst({
         where: {
-          location_id: location_id ? BigInt(location_id) : null,
-          cleaner_user_id: cleaner_user_id ? BigInt(cleaner_user_id) : null,
+          location_id: safeBigInt(location_id),
+          cleaner_user_id: safeBigInt(cleaner_user_id),
           status: "ongoing",
+          created_at: {
+            gte: twelveHoursAgo,
+            lte: twelveHoursAhead,
+          },
         },
       });
     }
@@ -486,17 +510,17 @@ export async function createCleanerReview(req, res) {
       review = await prisma.cleaner_review.create({
         data: {
           name,
-          location_id: location_id ? BigInt(location_id) : null,
+          location_id: safeBigInt(location_id),
           latitude: latitude ? parseFloat(latitude) : null,
           longitude: longitude ? parseFloat(longitude) : null,
           address,
-          cleaner_user_id: cleaner_user_id ? BigInt(cleaner_user_id) : null,
+          cleaner_user_id: safeBigInt(cleaner_user_id),
           tasks: parsedTasks,
           initial_comment: initial_comment || null,
           before_photo: beforePhotos,
           after_photo: [],
           status: "ongoing",
-          company_id: company_id ? BigInt(company_id) : null,
+          company_id: safeBigInt(company_id),
           created_at: created_at ? new Date(created_at) : undefined,
         },
       });
@@ -569,6 +593,11 @@ export async function completeCleanerReview(req, res) {
     // Default to true if not specified (supports the old app version)
     const isLast = is_last_section === undefined || is_last_section === "true" || is_last_section === true;
 
+    const cleanId = safeBigInt(id);
+    if (cleanId === null) {
+      return res.status(400).json({ status: "error", message: "Invalid review ID provided" });
+    }
+
     // const afterPhotos = req.uploadedFiles?.after_photo || [];
     const afterPhotos = (req.uploadedFiles?.after_photo || []).filter(
       (url) => !!url
@@ -594,7 +623,7 @@ export async function completeCleanerReview(req, res) {
 
     // Retrieve existing review
     const existing = await prisma.cleaner_review.findUnique({
-      where: { id: BigInt(id) },
+      where: { id: cleanId },
     });
 
     if (!existing) {
@@ -609,7 +638,7 @@ export async function completeCleanerReview(req, res) {
 
     if (!isLast) {
       const review = await prisma.cleaner_review.update({
-        where: { id: BigInt(id) },
+        where: { id: cleanId },
         data: {
           after_photo: updatedAfterPhotos,
           final_comment: updatedComment || null,
@@ -628,7 +657,7 @@ export async function completeCleanerReview(req, res) {
 
     // 1️⃣ Update the review immediately as "processing"
     const review = await prisma.cleaner_review.update({
-      where: { id: BigInt(id) },
+      where: { id: cleanId },
       data: {
         after_photo: updatedAfterPhotos,
         final_comment: updatedComment || null,
@@ -671,7 +700,7 @@ export async function completeCleanerReview(req, res) {
 
         // 2️⃣ Get review details for metadata
         const reviewData = await prisma.cleaner_review.findUnique({
-          where: { id: BigInt(id) },
+          where: { id: cleanId },
           select: {
             location_id: true,
             cleaner_user_id: true,
@@ -709,7 +738,7 @@ export async function completeCleanerReview(req, res) {
 
         // 5️⃣ Update cleaner_review with hygiene_score_id
         await prisma.cleaner_review.update({
-          where: { id: BigInt(id) },
+          where: { id: cleanId },
           data: {
             score: numericScore,
             original_score: numericScore,
@@ -816,7 +845,7 @@ export async function completeCleanerReview(req, res) {
           bgError.message
         );
         await prisma.cleaner_review.update({
-          where: { id: BigInt(id) },
+          where: { id: cleanId },
           data: {
             status: "failed",
             updated_at: new Date().toISOString(),
