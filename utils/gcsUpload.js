@@ -20,7 +20,7 @@ function initGCS() {
       console.log("🔐 Using service account key from file:", keyPath);
       storage = new Storage({ keyFilename: keyPath });
       useGCS = true;
-    } else if (clientEmail && privateKey) {
+    } else if (!process.env.K_SERVICE && clientEmail && privateKey) {
       console.log("🔐 Using service account credentials from .env");
       const formattedPrivateKey = privateKey.replace(/\\n/g, "\n");
       storage = new Storage({
