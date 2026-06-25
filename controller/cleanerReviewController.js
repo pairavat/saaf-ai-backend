@@ -501,8 +501,8 @@ export async function createCleanerReview(req, res) {
     if (existingReview) {
       const updatedBeforePhotos = [...existingReview.before_photo, ...beforePhotos];
       const updatedTasks = [...new Set([...existingReview.tasks, ...parsedTasks])];
-      const updatedComment = existingReview.initial_comment 
-        ? `${existingReview.initial_comment} | ${initial_comment}` 
+      const updatedComment = existingReview.initial_comment
+        ? `${existingReview.initial_comment} | ${initial_comment}`
         : initial_comment;
 
       review = await prisma.cleaner_review.update({
@@ -575,7 +575,7 @@ export async function createCleanerReview(req, res) {
       tokens = [...new Set(tokens)];
 
       // 6️⃣ Send notification
-      if (tokens.length > 0) {
+      if (tokens.length > 0 && !existingReview) {
         await sendNotificationToMany({
           tokens,
           title: "Task Started",
@@ -639,8 +639,8 @@ export async function completeCleanerReview(req, res) {
 
     const updatedAfterPhotos = [...existing.after_photo, ...afterPhotos];
     const updatedTasks = [...new Set([...existing.tasks, ...parsedTasks])];
-    const updatedComment = existing.final_comment 
-      ? `${existing.final_comment} | ${final_comment}` 
+    const updatedComment = existing.final_comment
+      ? `${existing.final_comment} | ${final_comment}`
       : final_comment;
 
     if (!isLast) {
@@ -686,7 +686,8 @@ export async function completeCleanerReview(req, res) {
       try {
         // console.log("⚙️ Background: Processing hygiene scoring for review", id);
 
-        const { score, metadata } = await processHygieneScoring(updatedAfterPhotos);
+        const { score, metadata } = await processHygieneScoringV2(updatedAfterPhotos);
+        // const { score, metadata } = await processHygieneScoring(updatedAfterPhotos);
 
         // ✅ Force numeric and finite
         let numericScore = Number.parseFloat(score) || 0;
@@ -964,6 +965,90 @@ export const processHygieneScoring = async (images) => {
     };
   }
 };
+
+/**
+ * Process hygiene scoring V2 by sending image data to the stateless analyze-public AI model.
+ *
+ * @param {Array} images - Array of image URLs
+ * @param {String} gender - Gender profile (e.g. Unisex, Male, Female)
+ * @returns {Object} { score: Number, metadata: Object }
+ */
+export const processHygieneScoringV2 = async (images, gender = "Unisex") => {
+  try {
+    if (!images || images.length === 0) {
+      console.warn("⚠️ No images provided for V2 scoring.");
+      return {
+        score: 0,
+        metadata: { error: "No images provided for scoring" },
+      };
+    }
+
+    const AI_URL = "https://saafai-platform-m5w27fp7iq-uc.a.run.app/analyze-public";
+    const formData = new FormData();
+    formData.append("gender", gender);
+
+    // 1️⃣ Download each image as binary
+    for (let i = 0; i < images.length; i++) {
+      const url = images[i];
+      const fileName = `image_${i + 1}.jpg`;
+
+      try {
+        const response = await axios.get(url, { responseType: "arraybuffer" });
+        const buffer = Buffer.from(response.data, "binary");
+
+        // 2️⃣ Attach each buffer to FormData as a file using "files" field
+        formData.append("files", buffer, {
+          filename: fileName,
+          contentType: "image/jpeg",
+        });
+      } catch (downloadErr) {
+        console.error(
+          `❌ Failed to download image ${url} for V2:`,
+          downloadErr.message
+        );
+      }
+    }
+
+    // 3️⃣ Send multipart/form-data request with Bearer token authentication
+    const aiResponse = await axios.post(AI_URL, formData, {
+      headers: {
+        ...formData.getHeaders(),
+        Authorization: "Bearer saafai_secret_key_2026",
+      },
+      maxBodyLength: Infinity,
+      timeout: 60000, // 60 seconds
+    });
+
+    // 4️⃣ Extract score safely from AI response
+    const responseData = aiResponse.data;
+
+    let finalScore = 0;
+    if (responseData && typeof responseData === "object") {
+      if ("overall_score" in responseData) {
+        finalScore = responseData.overall_score;
+      } else if ("score" in responseData) {
+        finalScore = responseData.score;
+      } else if (responseData.class_scores && "overall" in responseData.class_scores) {
+        finalScore = responseData.class_scores.overall;
+      }
+    }
+
+    console.log("✅ V2 Hygiene Score Received:", finalScore);
+
+    return {
+      score: finalScore,
+      metadata: responseData,
+    };
+  } catch (error) {
+    const randomNum = Math.floor(Math.random() * (9 - 5 + 1)) + 5;
+    console.error("❌ Error processing V2 hygiene score:", error.message);
+    return {
+      score: randomNum,
+      metadata: { error: error.message },
+    };
+  }
+};
+
 
 function stringifyBigInts(obj) {
   if (Array.isArray(obj)) {

@@ -16,7 +16,9 @@ import roleRouter from "./routes/roleRoutes.js";
 import registered_users_router from "./routes/registerUserApi.js";
 import notificationRouter from "./routes/notificationRoutes.js";
 import dotenv from "dotenv";
-dotenv.config();
+if (!process.env.K_SERVICE) {
+  dotenv.config();
+}
 
 const app = express();
 app.use(express.json());

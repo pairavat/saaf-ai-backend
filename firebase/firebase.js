@@ -29,12 +29,13 @@ const localKeyPath = path.join(__dirname, "serviceAccountKey.json");
 
 let serviceAccount;
 
-if (gcpSecretPath) {
+if (gcpSecretPath && gcpSecretPath.trim().startsWith("{")) {
   console.log("🔥 Using Firebase Admin SDK from GCP Secret Manager");
   serviceAccount = JSON.parse(gcpSecretPath);
 } else {
-  console.log("💻 Using local Firebase Admin SDK key");
-  serviceAccount = JSON.parse(fs.readFileSync(localKeyPath, "utf8"));
+  console.log("💻 Using Firebase Admin SDK key from file");
+  const keyPath = (gcpSecretPath && fs.existsSync(gcpSecretPath)) ? gcpSecretPath : localKeyPath;
+  serviceAccount = JSON.parse(fs.readFileSync(keyPath, "utf8"));
 }
 
 admin.initializeApp({
