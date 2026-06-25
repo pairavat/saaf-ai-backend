@@ -65,6 +65,12 @@ export async function uploadImage(buffer, folder = "uploads") {
 
     if (useGCS && bucket) {
       try {
+        // Diagnostic check: verify if the bucket exists/is accessible first
+        const [exists] = await bucket.exists();
+        if (!exists) {
+          throw new Error(`Bucket '${process.env.GCS_BUCKET_NAME}' does not exist or is not accessible.`);
+        }
+
         const gcsFileName = `${folder}/${fileName}`;
         const file = bucket.file(gcsFileName);
 
