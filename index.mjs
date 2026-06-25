@@ -1,3 +1,4 @@
+import "./loadEnv.js";
 import express from "express";
 import cors from "cors";
 import { verifyToken } from "./utils/jwt.js";
@@ -15,10 +16,6 @@ import companyRouter from "./routes/companyApiRoutes.js";
 import roleRouter from "./routes/roleRoutes.js";
 import registered_users_router from "./routes/registerUserApi.js";
 import notificationRouter from "./routes/notificationRoutes.js";
-import dotenv from "dotenv";
-if (!process.env.K_SERVICE) {
-  dotenv.config();
-}
 
 const app = express();
 app.use(express.json());
